@@ -5,7 +5,7 @@ import { useStore } from '../store/useStore';
 import { Expense, Settlement, ExpenseSplit } from '../types';
 
 export function useExpenses() {
-  const { user, currentGroupId, setExpenses, setSettlements, addToast } = useStore();
+  const { currentGroupId, setExpenses, setSettlements, addToast } = useStore();
 
   useEffect(() => {
     if (!currentGroupId) { setExpenses([]); setSettlements([]); return; }
@@ -16,12 +16,12 @@ export function useExpenses() {
     const unsubExp = onSnapshot(
       expQ,
       (snap) => { setExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() } as Expense))); },
-      (error) => { console.error('Expenses listener error:', error.message); }
+      (error) => { console.error('Expenses listener error:', error.code, error.message); }
     );
     const unsubSet = onSnapshot(
       setQ,
       (snap) => { setSettlements(snap.docs.map(d => ({ id: d.id, ...d.data() } as Settlement))); },
-      (error) => { console.error('Settlements listener error:', error.message); }
+      (error) => { console.error('Settlements listener error:', error.code, error.message); }
     );
 
     return () => { unsubExp(); unsubSet(); };
@@ -38,25 +38,35 @@ export function useExpenses() {
     date: string;
     note?: string;
   }) => {
-    if (!currentGroupId || !user) return;
+    // read latest state directly to avoid stale closure
+    const { currentGroupId: gid, user } = useStore.getState();
+    if (!gid || !user) {
+      addToast('لم يتم تحديد المجموعة. أعد المحاولة.', 'error');
+      return;
+    }
     try {
-      await addDoc(collection(db, 'groups', currentGroupId, 'expenses'), {
+      await addDoc(collection(db, 'groups', gid, 'expenses'), {
         ...data,
-        groupId: currentGroupId,
+        groupId: gid,
         createdAt: new Date().toISOString(),
       });
       addToast('تمت إضافة المصروف!', 'success');
-    } catch {
-      addToast('فشل إضافة المصروف.', 'error');
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error('addExpense error:', msg);
+      addToast(`فشل إضافة المصروف: ${msg}`, 'error');
     }
   };
 
   const deleteExpense = async (expenseId: string) => {
-    if (!currentGroupId) return;
+    const { currentGroupId: gid } = useStore.getState();
+    if (!gid) return;
     try {
-      await deleteDoc(doc(db, 'groups', currentGroupId, 'expenses', expenseId));
+      await deleteDoc(doc(db, 'groups', gid, 'expenses', expenseId));
       addToast('تم حذف المصروف.', 'success');
-    } catch {
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error('deleteExpense error:', msg);
       addToast('فشل حذف المصروف.', 'error');
     }
   };
@@ -71,15 +81,21 @@ export function useExpenses() {
     amount: number;
     note?: string;
   }) => {
-    if (!currentGroupId || !user) return;
+    const { currentGroupId: gid, user } = useStore.getState();
+    if (!gid || !user) {
+      addToast('لم يتم تحديد المجموعة.', 'error');
+      return;
+    }
     try {
-      await addDoc(collection(db, 'groups', currentGroupId, 'settlements'), {
+      await addDoc(collection(db, 'groups', gid, 'settlements'), {
         ...data,
-        groupId: currentGroupId,
+        groupId: gid,
         settledAt: new Date().toISOString(),
       });
       addToast('تم تسجيل التسوية!', 'success');
-    } catch {
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error('addSettlement error:', msg);
       addToast('فشل تسجيل التسوية.', 'error');
     }
   };

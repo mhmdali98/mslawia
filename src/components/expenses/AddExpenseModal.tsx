@@ -62,7 +62,7 @@ export function AddExpenseModal({ onClose }: Props) {
     }
 
     const payer = members.find(m => m.uid === paidBy);
-    if (!payer) return;
+    if (!payer) { addToast('لم يتم تحديد الدافع. انتظر تحميل الأعضاء.', 'error'); return; }
 
     setLoading(true);
     await addExpense({

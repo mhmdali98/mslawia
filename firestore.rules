@@ -8,7 +8,7 @@ service cloud.firestore {
 
     function isMemberOf(groupId) {
       return isAuth() &&
-        request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds;
+        exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid));
     }
 
     match /users/{userId} {
