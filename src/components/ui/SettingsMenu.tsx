@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bell, BellOff, Languages, Settings as SettingsIcon } from 'lucide-react';
+import { Bell, BellOff, Download, Languages, Settings as SettingsIcon, Check } from 'lucide-react';
 import { useNotifications } from '../../store/useNotifications';
 import { useLocale } from '../../lib/i18n';
 import { useStore } from '../../store/useStore';
+import { useInstall } from '../../store/useInstall';
 
 export function SettingsMenu() {
   const [open, setOpen] = useState(false);
@@ -10,6 +11,7 @@ export function SettingsMenu() {
   const { enabled, setEnabled, request } = useNotifications();
   const { locale, setLocale } = useLocale();
   const { addToast } = useStore();
+  const { deferred, installed, promptInstall } = useInstall();
 
   useEffect(() => {
     if (!open) return;
@@ -39,6 +41,16 @@ export function SettingsMenu() {
     else addToast('لم يتم تفعيل الإشعارات.', 'info');
   };
 
+  const handleInstall = async () => {
+    const outcome = await promptInstall();
+    if (outcome === 'unavailable') {
+      addToast('التطبيق مثبّت بالفعل أو غير متاح للتثبيت على هذا المتصفح.', 'info');
+    } else if (outcome === 'accepted') {
+      addToast('تم تثبيت التطبيق!', 'success');
+    }
+    setOpen(false);
+  };
+
   return (
     <div className="relative" ref={ref}>
       <button
@@ -59,6 +71,24 @@ export function SettingsMenu() {
               {enabled ? 'الإشعارات مُفعَّلة' : 'تفعيل الإشعارات'}
             </span>
           </button>
+          <div className="border-t border-slate-700" />
+          {installed ? (
+            <div className="w-full flex items-center gap-2 px-4 py-3 text-sm text-slate-500">
+              <Check size={15} className="text-emerald-400" />
+              <span className="flex-1 text-right">التطبيق مثبّت</span>
+            </div>
+          ) : (
+            <button
+              onClick={handleInstall}
+              disabled={!deferred}
+              className="w-full flex items-center gap-2 px-4 py-3 text-sm text-slate-300 hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+            >
+              <Download size={15} className={deferred ? 'text-emerald-400' : ''} />
+              <span className="flex-1 text-right">
+                {deferred ? 'تثبيت التطبيق' : 'تثبيت غير متاح'}
+              </span>
+            </button>
+          )}
           <div className="border-t border-slate-700" />
           <div className="px-4 py-3">
             <div className="flex items-center gap-2 text-slate-400 text-xs mb-2">

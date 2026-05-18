@@ -1,6 +1,6 @@
 // Minimal service worker for Mslawia PWA
 // Cache-first for app shell, network-first for navigation
-const CACHE = 'mslawia-v1';
+const CACHE = 'mslawia-v2';
 const ASSETS = [
   '/mslawia/',
   '/mslawia/index.html',
@@ -24,6 +24,40 @@ self.addEventListener('activate', (event) => {
     )
   );
   self.clients.claim();
+});
+
+// Show a system-tray notification on demand from the page
+self.addEventListener('message', (event) => {
+  const data = event.data;
+  if (!data || data.type !== 'notify') return;
+  const { title, body, tag, url } = data;
+  self.registration.showNotification(title || 'مصلاوية', {
+    body: body || '',
+    tag: tag || undefined,
+    icon: '/mslawia/icon-192.svg',
+    badge: '/mslawia/icon-192.svg',
+    dir: 'rtl',
+    lang: 'ar',
+    vibrate: [120, 60, 120],
+    data: { url: url || '/mslawia/' },
+  });
+});
+
+// Focus existing tab on notification click, or open one
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const target = (event.notification.data && event.notification.data.url) || '/mslawia/';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      for (const c of clients) {
+        if ('focus' in c) {
+          try { c.navigate(target); } catch (_) {}
+          return c.focus();
+        }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(target);
+    })
+  );
 });
 
 self.addEventListener('fetch', (event) => {

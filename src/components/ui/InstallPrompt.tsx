@@ -1,43 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Download, X } from 'lucide-react';
-
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
-}
+import { useInstall } from '../../store/useInstall';
 
 const DISMISSED_KEY = 'mslawia-install-dismissed';
 
 export function InstallPrompt() {
-  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
-  const [show, setShow] = useState(false);
+  const { deferred, installed, promptInstall } = useInstall();
+  const [dismissed, setDismissed] = useState(() => localStorage.getItem(DISMISSED_KEY) === '1');
 
-  useEffect(() => {
-    if (localStorage.getItem(DISMISSED_KEY) === '1') return;
-    // already running as installed PWA
-    if (window.matchMedia('(display-mode: standalone)').matches) return;
-
-    const handler = (e: Event) => {
-      e.preventDefault();
-      setDeferred(e as BeforeInstallPromptEvent);
-      setShow(true);
-    };
-    window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
-  }, []);
-
-  if (!show || !deferred) return null;
+  if (installed || dismissed || !deferred) return null;
 
   const handleInstall = async () => {
-    await deferred.prompt();
-    await deferred.userChoice;
-    setShow(false);
-    setDeferred(null);
+    await promptInstall();
   };
 
   const handleDismiss = () => {
     localStorage.setItem(DISMISSED_KEY, '1');
-    setShow(false);
+    setDismissed(true);
   };
 
   return (

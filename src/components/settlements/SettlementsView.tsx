@@ -10,6 +10,7 @@ import { Transfer } from '../../types';
 import { EmptyState } from '../ui/EmptyState';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { Avatar } from '../ui/Avatar';
+import { usePagination } from '../../hooks/usePagination';
 
 interface Props { transfers: Transfer[]; }
 
@@ -132,6 +133,8 @@ export function SettlementsView({ transfers }: Props) {
   const group = groups.find(g => g.id === currentGroupId);
   const groupCurrency = group?.currency || 'USD';
   const groupSymbol = getCurrency(groupCurrency).symbol;
+  const isOwner = group?.createdBy === user?.uid;
+  const canSettle = isOwner || group?.permissions?.membersCanSettle !== false;
 
   const handleSettle = async (t: Transfer) => {
     const key = `${t.from}-${t.to}`;
@@ -185,25 +188,29 @@ export function SettlementsView({ transfers }: Props) {
   };
 
   const isEmpty = transfers.length === 0 && settlements.length === 0;
+  const settlementsPage = usePagination(settlements, 10, currentGroupId);
+  const transfersPage = usePagination(transfers, 10, currentGroupId);
 
   return (
     <div className="space-y-6 pb-6">
       <div className="flex items-center justify-between">
         <h3 className="text-slate-300 font-semibold">التسويات</h3>
-        <button
-          onClick={() => setShowRecord(true)}
-          className="btn-secondary flex items-center gap-1.5 text-sm"
-        >
-          <Plus size={15} />
-          تسجيل دفعة
-        </button>
+        {canSettle && (
+          <button
+            onClick={() => setShowRecord(true)}
+            className="btn-secondary flex items-center gap-1.5 text-sm"
+          >
+            <Plus size={15} />
+            تسجيل دفعة
+          </button>
+        )}
       </div>
 
       {transfers.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-3">
             <p className="text-slate-500 text-xs">تحويلات مقترحة لتصفير الديون بأقل عدد دفعات</p>
-            {myTransfers.length > 1 && (
+            {canSettle && myTransfers.length > 1 && (
               <button
                 onClick={handleSettleAll}
                 disabled={loadingKey === 'all'}
@@ -214,7 +221,7 @@ export function SettlementsView({ transfers }: Props) {
             )}
           </div>
           <div className="space-y-2">
-            {transfers.map((t, i) => {
+            {transfersPage.visible.map((t, i) => {
               const key = `${t.from}-${t.to}`;
               const isInvolved = t.from === user?.uid || t.to === user?.uid;
               return (
@@ -229,7 +236,7 @@ export function SettlementsView({ transfers }: Props) {
                     <p className="text-emerald-400 font-bold">{t.amount.toFixed(2)} {groupSymbol}</p>
                   </div>
                   <Avatar uid={t.to} name={t.toName} photoURL={t.toPhoto} size="sm" />
-                  {isInvolved && (
+                  {isInvolved && canSettle && (
                     <button
                       onClick={() => handleSettle(t)}
                       disabled={loadingKey === key}
@@ -245,6 +252,16 @@ export function SettlementsView({ transfers }: Props) {
               );
             })}
           </div>
+          {transfersPage.hasMore && (
+            <div ref={transfersPage.sentinelRef} className="py-3 flex justify-center">
+              <button
+                onClick={transfersPage.loadMore}
+                className="text-slate-400 hover:text-slate-200 text-xs font-medium px-4 py-2 rounded-lg border border-slate-700 hover:border-slate-600 transition-colors"
+              >
+                عرض المزيد ({transfersPage.remaining})
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -252,9 +269,9 @@ export function SettlementsView({ transfers }: Props) {
         <div>
           <p className="text-slate-500 text-xs mb-3">سجل الدفعات المسجّلة</p>
           <div className="space-y-2">
-            {settlements.map(s => {
+            {settlementsPage.visible.map(s => {
               const symbol = getCurrency(s.currency || groupCurrency).symbol;
-              const canDelete = s.createdBy === user?.uid;
+              const canDelete = isOwner || s.createdBy === user?.uid;
               return (
                 <div key={s.id} className="card p-4 flex items-center gap-3">
                   <Avatar uid={s.from} name={s.fromName} photoURL={s.fromPhoto} size="sm" />
@@ -283,6 +300,16 @@ export function SettlementsView({ transfers }: Props) {
               );
             })}
           </div>
+          {settlementsPage.hasMore && (
+            <div ref={settlementsPage.sentinelRef} className="py-3 flex justify-center">
+              <button
+                onClick={settlementsPage.loadMore}
+                className="text-slate-400 hover:text-slate-200 text-xs font-medium px-4 py-2 rounded-lg border border-slate-700 hover:border-slate-600 transition-colors"
+              >
+                عرض المزيد ({settlementsPage.remaining})
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -291,7 +318,7 @@ export function SettlementsView({ transfers }: Props) {
           icon={ArrowLeftRight}
           title="لا توجد تسويات"
           description="أضف مصاريف لترى التسويات المقترحة، أو سجّل دفعة يدوية"
-          action={{ label: 'تسجيل دفعة', onClick: () => setShowRecord(true) }}
+          action={canSettle ? { label: 'تسجيل دفعة', onClick: () => setShowRecord(true) } : undefined}
         />
       )}
 

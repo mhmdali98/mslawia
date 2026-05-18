@@ -13,6 +13,11 @@ export interface GroupMember {
   joinedAt: string;
 }
 
+export interface GroupPermissions {
+  membersCanAddExpenses: boolean;
+  membersCanSettle: boolean;
+}
+
 export interface Group {
   id: string;
   name: string;
@@ -22,6 +27,7 @@ export interface Group {
   createdAt: string;
   memberCount: number;
   currency: string;
+  permissions?: GroupPermissions;
 }
 
 export type SplitType = 'equal' | 'custom' | 'percentage';

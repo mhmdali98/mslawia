@@ -6,6 +6,7 @@ import { getCurrency } from '../../lib/currencies';
 import { getExpenseCategory } from '../../lib/categories';
 import { EmptyState } from '../ui/EmptyState';
 import { Avatar } from '../ui/Avatar';
+import { usePagination } from '../../hooks/usePagination';
 import { Expense, Settlement } from '../../types';
 
 type ActivityItem =
@@ -21,8 +22,9 @@ export function ActivityFeed() {
   const items: ActivityItem[] = [
     ...expenses.map(e => ({ type: 'expense' as const, data: e, timestamp: e.createdAt })),
     ...settlements.map(s => ({ type: 'settlement' as const, data: s, timestamp: s.settledAt })),
-  ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-   .slice(0, 40);
+  ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+  const { visible, hasMore, loadMore, sentinelRef, remaining } = usePagination(items, 10, currentGroupId);
 
   if (items.length === 0) {
     return (
@@ -36,7 +38,7 @@ export function ActivityFeed() {
 
   return (
     <div className="space-y-2">
-      {items.map((item, i) => {
+      {visible.map((item, i) => {
         if (item.type === 'expense') {
           const e = item.data;
           const symbol = getCurrency(e.currency || groupCurrency).symbol;
@@ -101,6 +103,16 @@ export function ActivityFeed() {
           </div>
         );
       })}
+      {hasMore && (
+        <div ref={sentinelRef} className="py-4 flex justify-center">
+          <button
+            onClick={loadMore}
+            className="text-slate-400 hover:text-slate-200 text-xs font-medium px-4 py-2 rounded-lg border border-slate-700 hover:border-slate-600 transition-colors"
+          >
+            عرض المزيد ({remaining})
+          </button>
+        </div>
+      )}
     </div>
   );
 }
