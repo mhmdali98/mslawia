@@ -17,8 +17,10 @@ service cloud.firestore {
     }
 
     match /groups/{groupId} {
-      // read on list query: Firestore evaluates per-document, so use resource.data.memberIds
-      allow read: if isAuth() && request.auth.uid in resource.data.memberIds;
+      // get (single doc): any authenticated user can read by ID — needed for invite join flow
+      // list (collection query): only members can query their groups
+      allow get: if isAuth();
+      allow list: if isAuth() && request.auth.uid in resource.data.memberIds;
       allow create: if isAuth();
       // allow existing members to update, OR allow joining (user adds themselves to memberIds)
       allow update: if isAuth() && (
