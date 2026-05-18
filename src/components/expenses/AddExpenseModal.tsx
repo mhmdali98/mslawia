@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, ChevronDown } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useExpenses } from '../../hooks/useExpenses';
@@ -15,7 +15,15 @@ export function AddExpenseModal({ onClose }: Props) {
   const [amount, setAmount] = useState('');
   const [paidBy, setPaidBy] = useState(user?.uid || '');
   const [splitType, setSplitType] = useState<'equal' | 'custom'>('equal');
-  const [selectedMembers, setSelectedMembers] = useState<string[]>(members.map(m => m.uid));
+  const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+
+  // sync when members load (async from Firestore)
+  useEffect(() => {
+    if (members.length > 0 && selectedMembers.length === 0) {
+      setSelectedMembers(members.map(m => m.uid));
+    }
+    if (!paidBy && user?.uid) setPaidBy(user.uid);
+  }, [members, user]);
   const [customAmounts, setCustomAmounts] = useState<Record<string, string>>({});
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [note, setNote] = useState('');
