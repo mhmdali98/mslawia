@@ -12,6 +12,7 @@ import { calculateBalances, calculateMinTransfers, calculateDirectDebts } from '
 import { getCurrency } from '../../lib/currencies';
 import { ExpenseList } from '../expenses/ExpenseList';
 import { ExpenseFormModal } from '../expenses/ExpenseFormModal';
+import { ExpenseCard } from '../expenses/ExpenseCard';
 import { SettlementsView } from '../settlements/SettlementsView';
 import { EmptyState } from '../ui/EmptyState';
 import { Avatar } from '../ui/Avatar';
@@ -20,9 +21,9 @@ import { GroupSettingsModal } from './GroupSettingsModal';
 import { ActivityFeed } from '../activity/ActivityFeed';
 import { GroupStats } from './GroupStats';
 import { getGroupCategory } from '../../lib/categories';
-import { getExpenseCategory } from '../../lib/categories';
 import { confirmAction } from '../../store/useConfirm';
 import { useNickname } from '../../hooks/useNickname';
+import { Expense } from '../../types';
 
 type Tab = 'home' | 'expenses' | 'more';
 type MoreSubTab = 'activity' | 'stats' | 'history';
@@ -32,13 +33,14 @@ export function GroupPage() {
   const navigate = useNavigate();
   const { user, groups, members, expenses, settlements, setCurrentGroupId, addToast, cacheGroupBalance } = useStore();
   const { createInvite, deleteGroup, leaveGroup } = useGroups();
-  const { exportBackup, addSettlement } = useExpenses();
+  const { exportBackup, addSettlement, deleteExpense } = useExpenses();
   const [tab, setTab] = useState<Tab>('home');
   const [moreTab, setMoreTab] = useState<MoreSubTab>('activity');
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [settlingKey, setSettlingKey] = useState<string | null>(null);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -155,9 +157,25 @@ export function GroupPage() {
     navigate('/');
   };
 
+  const canEditExpense = (e: Expense) => isOwner || e.paidBy === user?.uid || e.createdBy === user?.uid;
+
+  const handleDeleteExpense = async (e: Expense) => {
+    const ok = await confirmAction({
+      title: 'حذف المصروف؟',
+      description: `سيتم حذف "${e.title}" بشكل نهائي.`,
+      confirmLabel: 'حذف',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    deleteExpense(e.id);
+  };
+
   // Recent 5 expenses sorted newest first
   const recentExpenses = [...expenses]
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .sort((a, b) => {
+      if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+      return (a.createdAt || '') < (b.createdAt || '') ? 1 : -1;
+    })
     .slice(0, 5);
 
   return (
@@ -346,27 +364,19 @@ export function GroupPage() {
                     عرض الكل ({expenses.length})
                   </button>
                 </div>
-                {recentExpenses.map((e) => {
-                  const sym = getCurrency(e.currency || group.currency).symbol;
-                  const cat = getExpenseCategory(e.category);
-                  const CatIcon = cat.icon;
-                  return (
-                    <div key={e.id} className="card p-3 flex items-center gap-3">
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${cat.bg}`}>
-                        <CatIcon size={16} className={cat.color} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-white text-sm font-medium truncate">{e.title}</p>
-                        <p className="text-slate-500 text-xs truncate">
-                          {e.paidBy === user?.uid ? 'أنت دفعت' : `${getNickname(e.paidBy, e.paidByName)} دفع`}
-                        </p>
-                      </div>
-                      <span className="text-slate-300 text-sm font-bold flex-shrink-0">
-                        {e.amount.toFixed(2)} {sym}
-                      </span>
-                    </div>
-                  );
-                })}
+                {recentExpenses.map((e) => (
+                  <ExpenseCard
+                    key={e.id}
+                    expense={e}
+                    user={user}
+                    members={members}
+                    defaultCurrency={group.currency}
+                    canEdit={canEditExpense(e)}
+                    getNickname={getNickname}
+                    onEdit={setEditingExpense}
+                    onDelete={handleDeleteExpense}
+                  />
+                ))}
               </div>
             )}
 
@@ -424,6 +434,13 @@ export function GroupPage() {
         <ExpenseFormModal
           onClose={() => setShowAddExpense(false)}
           defaultCurrency={group.currency}
+        />
+      )}
+      {editingExpense && (
+        <ExpenseFormModal
+          expense={editingExpense}
+          defaultCurrency={group.currency}
+          onClose={() => setEditingExpense(null)}
         />
       )}
       {showSettings && (
