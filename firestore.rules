@@ -1,0 +1,47 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isGroupMember(groupId) {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid));
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if request.auth.uid == userId;
+    }
+
+    match /groups/{groupId} {
+      allow read: if isGroupMember(groupId);
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && resource.data.createdBy == request.auth.uid;
+
+      match /members/{memberId} {
+        allow read: if isGroupMember(groupId);
+        allow create: if isAuthenticated();
+        allow delete: if isAuthenticated() && request.auth.uid == memberId;
+      }
+
+      match /expenses/{expenseId} {
+        allow read: if isGroupMember(groupId);
+        allow create: if isGroupMember(groupId);
+        allow update, delete: if isGroupMember(groupId) && resource.data.paidBy == request.auth.uid;
+      }
+
+      match /settlements/{settlementId} {
+        allow read: if isGroupMember(groupId);
+        allow create, update: if isGroupMember(groupId);
+      }
+    }
+
+    match /invites/{inviteCode} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow delete: if isAuthenticated() && resource.data.createdBy == request.auth.uid;
+    }
+  }
+}
