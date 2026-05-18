@@ -1,47 +1,47 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isAuthenticated() {
+
+    function isAuth() {
       return request.auth != null;
     }
 
-    function isGroupMember(groupId) {
-      return isAuthenticated() &&
-        exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid));
+    function isMemberOf(groupId) {
+      return isAuth() &&
+        request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds;
     }
 
     match /users/{userId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuth();
       allow write: if request.auth.uid == userId;
     }
 
     match /groups/{groupId} {
-      allow read: if isGroupMember(groupId);
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && resource.data.createdBy == request.auth.uid;
+      // read on list query: Firestore evaluates per-document, so use resource.data.memberIds
+      allow read: if isAuth() && request.auth.uid in resource.data.memberIds;
+      allow create: if isAuth();
+      allow update: if isAuth() && request.auth.uid in resource.data.memberIds;
+      allow delete: if isAuth() && resource.data.createdBy == request.auth.uid;
 
       match /members/{memberId} {
-        allow read: if isGroupMember(groupId);
-        allow create: if isAuthenticated();
-        allow delete: if isAuthenticated() && request.auth.uid == memberId;
+        allow read: if isMemberOf(groupId);
+        allow create: if isAuth();
+        allow delete: if isAuth() && request.auth.uid == memberId;
       }
 
       match /expenses/{expenseId} {
-        allow read: if isGroupMember(groupId);
-        allow create: if isGroupMember(groupId);
-        allow update, delete: if isGroupMember(groupId) && resource.data.paidBy == request.auth.uid;
+        allow read, create: if isMemberOf(groupId);
+        allow update, delete: if isAuth() && resource.data.paidBy == request.auth.uid;
       }
 
       match /settlements/{settlementId} {
-        allow read: if isGroupMember(groupId);
-        allow create, update: if isGroupMember(groupId);
+        allow read, create, update: if isMemberOf(groupId);
       }
     }
 
     match /invites/{inviteCode} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow delete: if isAuthenticated() && resource.data.createdBy == request.auth.uid;
+      allow read, create: if isAuth();
+      allow delete: if isAuth() && resource.data.createdBy == request.auth.uid;
     }
   }
 }
