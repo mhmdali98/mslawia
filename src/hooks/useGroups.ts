@@ -18,10 +18,16 @@ export function useGroups() {
       where('memberIds', 'array-contains', user.uid)
     );
 
-    const unsub = onSnapshot(memberGroupsQuery, (snap) => {
-      const groups: Group[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as Group));
-      setGroups(groups);
-    });
+    const unsub = onSnapshot(
+      memberGroupsQuery,
+      (snap) => {
+        const groups: Group[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as Group));
+        setGroups(groups);
+      },
+      (error) => {
+        console.error('Groups listener error:', error.message);
+      }
+    );
 
     return unsub;
   }, [user, setGroups]);
@@ -30,10 +36,16 @@ export function useGroups() {
     if (!currentGroupId) { setMembers([]); return; }
 
     const membersRef = collection(db, 'groups', currentGroupId, 'members');
-    const unsub = onSnapshot(membersRef, (snap) => {
-      const members: GroupMember[] = snap.docs.map(d => ({ uid: d.id, ...d.data() } as GroupMember));
-      setMembers(members);
-    });
+    const unsub = onSnapshot(
+      membersRef,
+      (snap) => {
+        const members: GroupMember[] = snap.docs.map(d => ({ uid: d.id, ...d.data() } as GroupMember));
+        setMembers(members);
+      },
+      (error) => {
+        console.error('Members listener error:', error.message);
+      }
+    );
     return unsub;
   }, [currentGroupId, setMembers]);
 
