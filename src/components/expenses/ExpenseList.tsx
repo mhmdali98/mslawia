@@ -6,13 +6,15 @@ import { useStore } from '../../store/useStore';
 import { useExpenses } from '../../hooks/useExpenses';
 import { getCurrency } from '../../lib/currencies';
 import { EXPENSE_CATEGORIES, getExpenseCategory } from '../../lib/categories';
+import { confirmAction } from '../../store/useConfirm';
 import { EmptyState } from '../ui/EmptyState';
+import { ExpenseSkeleton } from '../ui/Skeleton';
 import { Avatar } from '../ui/Avatar';
 import { ExpenseFormModal } from './ExpenseFormModal';
 import { Expense } from '../../types';
 
 export function ExpenseList() {
-  const { expenses, user, members, groups, currentGroupId } = useStore();
+  const { expenses, user, members, groups, currentGroupId, expensesLoaded } = useStore();
   const { deleteExpense } = useExpenses();
   const [editing, setEditing] = useState<Expense | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -33,12 +35,26 @@ export function ExpenseList() {
 
   const canEdit = (e: Expense) => e.paidBy === user?.uid || e.createdBy === user?.uid;
 
-  const handleDelete = (e: Expense) => {
-    if (!confirm('هل تريد حذف هذا المصروف؟')) return;
+  const handleDelete = async (e: Expense) => {
+    const ok = await confirmAction({
+      title: 'حذف المصروف؟',
+      description: `سيتم حذف "${e.title}" بشكل نهائي.`,
+      confirmLabel: 'حذف',
+      variant: 'danger',
+    });
+    if (!ok) return;
     deleteExpense(e.id);
   };
 
   const toggleExpand = (id: string) => setExpanded(prev => prev === id ? null : id);
+
+  if (!expensesLoaded) {
+    return (
+      <div className="space-y-3">
+        {[1, 2, 3, 4].map(i => <ExpenseSkeleton key={i} />)}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

@@ -23,6 +23,7 @@ export function useGroups() {
       (snap) => {
         const groups: Group[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as Group));
         setGroups(groups);
+        useStore.getState().setGroupsLoaded(true);
       },
       (error) => { console.error('Groups listener error:', error.code, error.message); }
     );

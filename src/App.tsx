@@ -10,6 +10,7 @@ import { Dashboard } from './components/dashboard/Dashboard';
 import { GroupPage } from './components/groups/GroupPage';
 import { ToastContainer } from './components/ui/Toast';
 import { FullPageLoader } from './components/ui/LoadingSpinner';
+import { ConfirmDialog } from './components/ui/ConfirmDialog';
 
 function AppRoutes() {
   const { user } = useStore();
@@ -41,6 +42,7 @@ export default function App() {
     <BrowserRouter basename="/mslawia">
       <AppRoutes />
       <ToastContainer />
+      <ConfirmDialog />
     </BrowserRouter>
   );
 }
