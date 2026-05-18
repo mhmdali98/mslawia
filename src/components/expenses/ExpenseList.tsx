@@ -6,13 +6,25 @@ import { useStore } from '../../store/useStore';
 import { useExpenses } from '../../hooks/useExpenses';
 import { getCurrency } from '../../lib/currencies';
 import { EXPENSE_CATEGORIES, getExpenseCategory } from '../../lib/categories';
+import { confirmAction } from '../../store/useConfirm';
 import { EmptyState } from '../ui/EmptyState';
+import { ExpenseSkeleton } from '../ui/Skeleton';
 import { Avatar } from '../ui/Avatar';
 import { ExpenseFormModal } from './ExpenseFormModal';
 import { Expense } from '../../types';
 
+const MONTH_NAMES = [
+  'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+  'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
+];
+
+function monthLabel(dateStr: string) {
+  const [y, m] = dateStr.slice(0, 7).split('-');
+  return `${MONTH_NAMES[parseInt(m, 10) - 1]} ${y}`;
+}
+
 export function ExpenseList() {
-  const { expenses, user, members, groups, currentGroupId } = useStore();
+  const { expenses, user, members, groups, currentGroupId, expensesLoaded } = useStore();
   const { deleteExpense } = useExpenses();
   const [editing, setEditing] = useState<Expense | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -33,12 +45,26 @@ export function ExpenseList() {
 
   const canEdit = (e: Expense) => e.paidBy === user?.uid || e.createdBy === user?.uid;
 
-  const handleDelete = (e: Expense) => {
-    if (!confirm('هل تريد حذف هذا المصروف؟')) return;
+  const handleDelete = async (e: Expense) => {
+    const ok = await confirmAction({
+      title: 'حذف المصروف؟',
+      description: `سيتم حذف "${e.title}" بشكل نهائي.`,
+      confirmLabel: 'حذف',
+      variant: 'danger',
+    });
+    if (!ok) return;
     deleteExpense(e.id);
   };
 
   const toggleExpand = (id: string) => setExpanded(prev => prev === id ? null : id);
+
+  if (!expensesLoaded) {
+    return (
+      <div className="space-y-3">
+        {[1, 2, 3, 4].map(i => <ExpenseSkeleton key={i} />)}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -101,119 +127,17 @@ export function ExpenseList() {
           <EmptyState icon={Search} title="لا نتائج" description="جرّب تغيير كلمة البحث أو الفئة" />
         )
       ) : (
-        <div className="space-y-3">
-          {filtered.map(expense => {
-            const myShare = expense.splits.find(s => s.uid === user?.uid);
-            const isMyExpense = expense.paidBy === user?.uid;
-            const symbol = getCurrency(expense.currency || defaultCurrency).symbol;
-            const cat = getExpenseCategory(expense.category);
-            const CatIcon = cat.icon;
-            const isExpanded = expanded === expense.id;
-
-            return (
-              <div key={expense.id} className="card overflow-hidden">
-                <div className="p-4">
-                  <div className="flex items-start gap-3">
-                    <button
-                      onClick={() => toggleExpand(expense.id)}
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${cat.bg} hover:opacity-80`}
-                    >
-                      <CatIcon className={cat.color} size={18} />
-                    </button>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <button
-                            onClick={() => toggleExpand(expense.id)}
-                            className="text-white font-semibold truncate hover:text-emerald-300 transition-colors text-right w-full text-sm"
-                          >
-                            {expense.title}
-                          </button>
-                          <p className="text-slate-500 text-xs mt-0.5">
-                            {expense.paidByName} · {format(new Date(expense.date), 'dd MMM', { locale: ar })}
-                            {expense.updatedAt && <span className="text-slate-600"> · مُعدَّل</span>}
-                          </p>
-                        </div>
-                        <span className="text-white font-bold flex-shrink-0">{expense.amount.toFixed(2)} {symbol}</span>
-                      </div>
-
-                      <div className="flex items-center justify-between mt-2">
-                        {myShare ? (
-                          <span className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg bg-slate-800 ${
-                            isMyExpense ? 'text-emerald-400' : 'text-red-400'
-                          }`}>
-                            {isMyExpense
-                              ? `دفعت أنت · حصتك ${myShare.amount.toFixed(2)} ${symbol}`
-                              : `حصتك: ${myShare.amount.toFixed(2)} ${symbol}`}
-                          </span>
-                        ) : <span />}
-
-                        <div className="flex items-center gap-1">
-                          {canEdit(expense) && (
-                            <>
-                              <button
-                                onClick={() => setEditing(expense)}
-                                className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-400 hover:bg-emerald-400/10 transition-colors"
-                                aria-label="تعديل"
-                              >
-                                <Edit2 size={14} />
-                              </button>
-                              <button
-                                onClick={() => handleDelete(expense)}
-                                className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"
-                                aria-label="حذف"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </>
-                          )}
-                          <button
-                            onClick={() => toggleExpand(expense.id)}
-                            className="p-1.5 rounded-lg text-slate-600 hover:text-slate-400 transition-colors"
-                          >
-                            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                          </button>
-                        </div>
-                      </div>
-
-                      {expense.note && (
-                        <p className="text-slate-500 text-xs mt-2 italic">{expense.note}</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Expanded detail */}
-                {isExpanded && (
-                  <div className="px-4 pb-4 border-t border-slate-800 pt-3 space-y-2">
-                    <p className="text-slate-500 text-xs font-medium mb-2">تفاصيل التقسيم</p>
-                    {expense.splits.map(s => {
-                      const member = members.find(m => m.uid === s.uid);
-                      const isPayer = s.uid === expense.paidBy;
-                      return (
-                        <div key={s.uid} className="flex items-center gap-2.5">
-                          <Avatar
-                            uid={s.uid}
-                            name={member?.displayName || '?'}
-                            photoURL={member?.photoURL}
-                            size="xs"
-                          />
-                          <span className="text-slate-300 text-xs flex-1">
-                            {s.uid === user?.uid ? 'أنت' : member?.displayName || '؟'}
-                            {isPayer && <span className="text-emerald-500 text-xs mr-1">(دافع)</span>}
-                          </span>
-                          <span className={`text-xs font-medium ${isPayer ? 'text-emerald-400' : 'text-red-400'}`}>
-                            {isPayer ? '+' : '-'}{s.amount.toFixed(2)} {symbol}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+        <ExpenseListItems
+          filtered={filtered}
+          expanded={expanded}
+          toggleExpand={toggleExpand}
+          canEdit={canEdit}
+          setEditing={setEditing}
+          handleDelete={handleDelete}
+          user={user}
+          members={members}
+          defaultCurrency={defaultCurrency}
+        />
       )}
 
       {editing && (
@@ -223,6 +147,145 @@ export function ExpenseList() {
           onClose={() => setEditing(null)}
         />
       )}
+    </div>
+  );
+}
+
+interface ItemsProps {
+  filtered: Expense[];
+  expanded: string | null;
+  toggleExpand: (id: string) => void;
+  canEdit: (e: Expense) => boolean;
+  setEditing: (e: Expense) => void;
+  handleDelete: (e: Expense) => void;
+  user: { uid: string } | null;
+  members: { uid: string; displayName: string; photoURL: string }[];
+  defaultCurrency: string;
+}
+
+function ExpenseListItems({
+  filtered, expanded, toggleExpand, canEdit, setEditing, handleDelete, user, members, defaultCurrency,
+}: ItemsProps) {
+  let lastMonth = '';
+
+  return (
+    <div className="space-y-2">
+      {filtered.map(expense => {
+        const monthKey = expense.date.slice(0, 7);
+        const isNewMonth = monthKey !== lastMonth;
+        lastMonth = monthKey;
+
+        const myShare = expense.splits.find(s => s.uid === user?.uid);
+        const isMyExpense = expense.paidBy === user?.uid;
+        const symbol = getCurrency(expense.currency || defaultCurrency).symbol;
+        const cat = getExpenseCategory(expense.category);
+        const CatIcon = cat.icon;
+        const isExpanded = expanded === expense.id;
+
+        return (
+          <div key={expense.id}>
+            {isNewMonth && (
+              <p className="text-slate-500 text-xs font-medium px-1 pt-3 pb-2">
+                {monthLabel(expense.date)}
+              </p>
+            )}
+            <div className="card overflow-hidden">
+              <div className="p-4">
+                <div className="flex items-start gap-3">
+                  <button
+                    onClick={() => toggleExpand(expense.id)}
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${cat.bg} hover:opacity-80`}
+                  >
+                    <CatIcon className={cat.color} size={18} />
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <button
+                          onClick={() => toggleExpand(expense.id)}
+                          className="text-white font-semibold truncate hover:text-emerald-300 transition-colors text-right w-full text-sm"
+                        >
+                          {expense.title}
+                        </button>
+                        <p className="text-slate-500 text-xs mt-0.5">
+                          {expense.paidByName} · {format(new Date(expense.date), 'dd MMM', { locale: ar })}
+                          {expense.updatedAt && <span className="text-slate-600"> · مُعدَّل</span>}
+                        </p>
+                      </div>
+                      <span className="text-white font-bold flex-shrink-0">{expense.amount.toFixed(2)} {symbol}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between mt-2">
+                      {myShare ? (
+                        <span className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg bg-slate-800 ${
+                          isMyExpense ? 'text-emerald-400' : 'text-red-400'
+                        }`}>
+                          {isMyExpense
+                            ? `دفعت أنت · حصتك ${myShare.amount.toFixed(2)} ${symbol}`
+                            : `حصتك: ${myShare.amount.toFixed(2)} ${symbol}`}
+                        </span>
+                      ) : <span />}
+
+                      <div className="flex items-center gap-1">
+                        {canEdit(expense) && (
+                          <>
+                            <button
+                              onClick={() => setEditing(expense)}
+                              className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-400 hover:bg-emerald-400/10 transition-colors"
+                              aria-label="تعديل"
+                            >
+                              <Edit2 size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(expense)}
+                              className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                              aria-label="حذف"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </>
+                        )}
+                        <button
+                          onClick={() => toggleExpand(expense.id)}
+                          className="p-1.5 rounded-lg text-slate-600 hover:text-slate-400 transition-colors"
+                        >
+                          {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {expense.note && (
+                      <p className="text-slate-500 text-xs mt-2 italic">{expense.note}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {isExpanded && (
+                <div className="px-4 pb-4 border-t border-slate-800 pt-3 space-y-2">
+                  <p className="text-slate-500 text-xs font-medium mb-2">تفاصيل التقسيم</p>
+                  {expense.splits.map(s => {
+                    const member = members.find(m => m.uid === s.uid);
+                    const isPayer = s.uid === expense.paidBy;
+                    return (
+                      <div key={s.uid} className="flex items-center gap-2.5">
+                        <Avatar uid={s.uid} name={member?.displayName || '?'} photoURL={member?.photoURL} size="xs" />
+                        <span className="text-slate-300 text-xs flex-1">
+                          {s.uid === user?.uid ? 'أنت' : member?.displayName || '؟'}
+                          {isPayer && <span className="text-emerald-500 text-xs mr-1">(دافع)</span>}
+                        </span>
+                        <span className={`text-xs font-medium ${isPayer ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {isPayer ? '+' : '-'}{s.amount.toFixed(2)} {symbol}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

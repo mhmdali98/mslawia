@@ -48,3 +48,13 @@
     @apply text-slate-400 text-sm font-medium mb-1.5 block;
   }
 }
+
+@layer utilities {
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}

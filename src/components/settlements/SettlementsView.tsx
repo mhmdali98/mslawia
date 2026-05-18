@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useStore } from '../../store/useStore';
 import { useExpenses } from '../../hooks/useExpenses';
+import { confirmAction } from '../../store/useConfirm';
 import { getCurrency } from '../../lib/currencies';
 import { Transfer } from '../../types';
 import { EmptyState } from '../ui/EmptyState';
@@ -148,8 +149,38 @@ export function SettlementsView({ transfers }: Props) {
     setLoadingKey(null);
   };
 
-  const handleDelete = (id: string) => {
-    if (!confirm('هل تريد حذف هذه التسوية؟')) return;
+  const myTransfers = transfers.filter(t => t.from === user?.uid || t.to === user?.uid);
+  const handleSettleAll = async () => {
+    const ok = await confirmAction({
+      title: 'تسوية جميع ديونك؟',
+      description: `سيتم تسجيل ${myTransfers.length} دفعات تشمل كل التحويلات المقترحة المتعلقة بك.`,
+      confirmLabel: 'تسوية الكل',
+    });
+    if (!ok) return;
+    setLoadingKey('all');
+    for (const t of myTransfers) {
+      await addSettlement({
+        from: t.from,
+        fromName: t.fromName,
+        fromPhoto: t.fromPhoto,
+        to: t.to,
+        toName: t.toName,
+        toPhoto: t.toPhoto,
+        amount: t.amount,
+        currency: groupCurrency,
+      });
+    }
+    setLoadingKey(null);
+  };
+
+  const handleDelete = async (id: string) => {
+    const ok = await confirmAction({
+      title: 'حذف التسوية؟',
+      description: 'سيتم حذف هذه الدفعة المسجّلة بشكل نهائي.',
+      confirmLabel: 'حذف',
+      variant: 'danger',
+    });
+    if (!ok) return;
     deleteSettlement(id);
   };
 
@@ -170,7 +201,18 @@ export function SettlementsView({ transfers }: Props) {
 
       {transfers.length > 0 && (
         <div>
-          <p className="text-slate-500 text-xs mb-3">تحويلات مقترحة لتصفير الديون بأقل عدد دفعات</p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-slate-500 text-xs">تحويلات مقترحة لتصفير الديون بأقل عدد دفعات</p>
+            {myTransfers.length > 1 && (
+              <button
+                onClick={handleSettleAll}
+                disabled={loadingKey === 'all'}
+                className="text-emerald-400 hover:text-emerald-300 text-xs font-medium flex items-center gap-1 transition-colors disabled:opacity-50"
+              >
+                {loadingKey === 'all' ? <LoadingSpinner size="sm" /> : <><CheckCircle size={12} /> تسوية الكل</>}
+              </button>
+            )}
+          </div>
           <div className="space-y-2">
             {transfers.map((t, i) => {
               const key = `${t.from}-${t.to}`;

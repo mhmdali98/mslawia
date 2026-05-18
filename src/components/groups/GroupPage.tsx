@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowRight, Plus, Users, Receipt, ArrowLeftRight,
-  Copy, Trash2, LogOut, Download, MoreVertical, Settings, Activity,
+  Copy, Trash2, LogOut, Download, MoreVertical, Settings, Activity, BarChart3,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useGroups } from '../../hooks/useGroups';
@@ -16,9 +16,11 @@ import { EmptyState } from '../ui/EmptyState';
 import { Avatar } from '../ui/Avatar';
 import { GroupSettingsModal } from './GroupSettingsModal';
 import { ActivityFeed } from '../activity/ActivityFeed';
+import { GroupStats } from './GroupStats';
 import { getGroupCategory } from '../../lib/categories';
+import { confirmAction } from '../../store/useConfirm';
 
-type Tab = 'expenses' | 'balances' | 'settlements' | 'activity';
+type Tab = 'expenses' | 'balances' | 'settlements' | 'activity' | 'stats';
 
 export function GroupPage() {
   const { groupId } = useParams<{ groupId: string }>();
@@ -58,23 +60,36 @@ export function GroupPage() {
   const handleCopyInvite = async () => {
     const code = await createInvite(group.id, group.name);
     if (code) {
+      const link = `${window.location.origin}/mslawia/join/${code}`;
       try {
-        await navigator.clipboard.writeText(code);
-        addToast(`رمز الدعوة: ${code} — تم النسخ!`, 'success');
+        await navigator.clipboard.writeText(link);
+        addToast('تم نسخ رابط الدعوة!', 'success');
       } catch {
-        addToast(`رمز الدعوة: ${code}`, 'info');
+        addToast(`رابط الدعوة: ${link}`, 'info');
       }
     }
   };
 
   const handleDelete = async () => {
-    if (!confirm('هل تريد حذف المجموعة؟ لا يمكن التراجع.')) return;
+    const ok = await confirmAction({
+      title: 'حذف المجموعة؟',
+      description: 'سيتم حذف المجموعة وكل بياناتها بشكل نهائي. لا يمكن التراجع.',
+      confirmLabel: 'حذف',
+      variant: 'danger',
+    });
+    if (!ok) return;
     await deleteGroup(group.id);
     navigate('/');
   };
 
   const handleLeave = async () => {
-    if (!confirm('هل تريد مغادرة المجموعة؟')) return;
+    const ok = await confirmAction({
+      title: 'مغادرة المجموعة؟',
+      description: 'لن تتمكن من رؤية المصاريف أو إضافة جديدة بعد المغادرة.',
+      confirmLabel: 'مغادرة',
+      variant: 'danger',
+    });
+    if (!ok) return;
     await leaveGroup(group.id);
     navigate('/');
   };
@@ -181,17 +196,18 @@ export function GroupPage() {
       )}
 
       <div className="max-w-2xl mx-auto px-4 pt-4 pb-8">
-        <div className="flex gap-1 bg-slate-900 border border-slate-800 p-1 rounded-xl mb-6">
+        <div className="flex gap-1 bg-slate-900 border border-slate-800 p-1 rounded-xl mb-6 overflow-x-auto scrollbar-none">
           {([
             { key: 'expenses', label: 'المصاريف', icon: Receipt },
             { key: 'balances', label: 'الأرصدة', icon: Users },
             { key: 'settlements', label: 'التسويات', icon: ArrowLeftRight },
             { key: 'activity', label: 'النشاط', icon: Activity },
+            { key: 'stats', label: 'إحصائيات', icon: BarChart3 },
           ] as const).map(({ key, label, icon: Icon }) => (
             <button
               key={key}
               onClick={() => setTab(key)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex-1 flex-shrink-0 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
                 tab === key ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-300'
               }`}
             >
@@ -255,6 +271,8 @@ export function GroupPage() {
         {tab === 'settlements' && <SettlementsView transfers={transfers} />}
 
         {tab === 'activity' && <ActivityFeed />}
+
+        {tab === 'stats' && <GroupStats />}
       </div>
 
       {showAddExpense && (

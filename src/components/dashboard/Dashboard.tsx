@@ -7,9 +7,10 @@ import { GroupCard } from '../groups/GroupCard';
 import { CreateGroupModal } from '../groups/CreateGroupModal';
 import { EmptyState } from '../ui/EmptyState';
 import { Avatar } from '../ui/Avatar';
+import { GroupCardSkeleton } from '../ui/Skeleton';
 
 export function Dashboard() {
-  const { user, groups } = useStore();
+  const { user, groups, groupsLoaded } = useStore();
   const { logout } = useAuth();
   useGroups();
   const [showCreate, setShowCreate] = useState(false);
@@ -41,7 +42,7 @@ export function Dashboard() {
           <div>
             <h2 className="text-2xl font-bold text-white">مجموعاتي</h2>
             <p className="text-slate-400 text-sm mt-0.5">
-              {groups.length === 0 ? 'لا توجد مجموعات بعد' : `${groups.length} مجموعة`}
+              {!groupsLoaded ? '...' : groups.length === 0 ? 'لا توجد مجموعات بعد' : `${groups.length} مجموعة`}
             </p>
           </div>
           <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2">
@@ -50,7 +51,11 @@ export function Dashboard() {
           </button>
         </div>
 
-        {groups.length === 0 ? (
+        {!groupsLoaded ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map(i => <GroupCardSkeleton key={i} />)}
+          </div>
+        ) : groups.length === 0 ? (
           <EmptyState
             icon={Users}
             title="لا توجد مجموعات"

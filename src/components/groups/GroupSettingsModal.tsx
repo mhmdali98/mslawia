@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, ChevronDown, UserMinus, Crown } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useGroups } from '../../hooks/useGroups';
+import { confirmAction } from '../../store/useConfirm';
 import { CURRENCIES } from '../../lib/currencies';
 import { GROUP_CATEGORIES } from '../../lib/categories';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
@@ -39,7 +40,13 @@ export function GroupSettingsModal({ group, onClose }: Props) {
   };
 
   const handleRemove = async (memberUid: string, memberName: string) => {
-    if (!confirm(`هل تريد إزالة ${memberName} من المجموعة؟`)) return;
+    const ok = await confirmAction({
+      title: 'إزالة العضو؟',
+      description: `سيتم إزالة ${memberName} من المجموعة.`,
+      confirmLabel: 'إزالة',
+      variant: 'danger',
+    });
+    if (!ok) return;
     await removeMember(group.id, memberUid);
   };
 

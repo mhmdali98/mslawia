@@ -11,6 +11,8 @@ interface AppState {
   settlements: Settlement[];
   toasts: Toast[];
   isLoading: boolean;
+  groupsLoaded: boolean;
+  expensesLoaded: boolean;
 
   setUser: (user: User | null) => void;
   setGroups: (groups: Group[]) => void;
@@ -18,6 +20,8 @@ interface AppState {
   setMembers: (members: GroupMember[]) => void;
   setExpenses: (expenses: Expense[]) => void;
   setSettlements: (settlements: Settlement[]) => void;
+  setGroupsLoaded: (loaded: boolean) => void;
+  setExpensesLoaded: (loaded: boolean) => void;
   addToast: (message: string, type: Toast['type']) => void;
   removeToast: (id: string) => void;
   setLoading: (loading: boolean) => void;
@@ -35,6 +39,8 @@ export const useStore = create<AppState>()(
       settlements: [],
       toasts: [],
       isLoading: false,
+      groupsLoaded: false,
+      expensesLoaded: false,
 
       setUser: (user) => set({ user }),
       setGroups: (groups) => set({ groups }),
@@ -42,6 +48,8 @@ export const useStore = create<AppState>()(
       setMembers: (members) => set({ members }),
       setExpenses: (expenses) => set({ expenses }),
       setSettlements: (settlements) => set({ settlements }),
+      setGroupsLoaded: (groupsLoaded) => set({ groupsLoaded }),
+      setExpensesLoaded: (expensesLoaded) => set({ expensesLoaded }),
       addToast: (message, type) => {
         const id = Math.random().toString(36).slice(2);
         set((state) => ({ toasts: [...state.toasts, { id, message, type }] }));
@@ -60,6 +68,8 @@ export const useStore = create<AppState>()(
         settlements: [],
         toasts: [],
         isLoading: false,
+        groupsLoaded: false,
+        expensesLoaded: false,
       }),
     }),
     {

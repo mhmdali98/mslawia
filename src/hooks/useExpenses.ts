@@ -41,14 +41,22 @@ export function useExpenses() {
   const { currentGroupId, setExpenses, setSettlements, addToast } = useStore();
 
   useEffect(() => {
-    if (!currentGroupId) { setExpenses([]); setSettlements([]); return; }
+    if (!currentGroupId) {
+      setExpenses([]);
+      setSettlements([]);
+      useStore.getState().setExpensesLoaded(false);
+      return;
+    }
 
     const expQ = query(collection(db, 'groups', currentGroupId, 'expenses'), orderBy('date', 'desc'));
     const setQ = query(collection(db, 'groups', currentGroupId, 'settlements'), orderBy('settledAt', 'desc'));
 
     const unsubExp = onSnapshot(
       expQ,
-      (snap) => { setExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() } as Expense))); },
+      (snap) => {
+        setExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() } as Expense)));
+        useStore.getState().setExpensesLoaded(true);
+      },
       (error) => { console.error('Expenses listener error:', error.code, error.message); }
     );
     const unsubSet = onSnapshot(
