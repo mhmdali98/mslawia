@@ -9,7 +9,7 @@ import { getCurrency } from '../../lib/currencies';
 import { EmptyState } from '../ui/EmptyState';
 import { Avatar } from '../ui/Avatar';
 import { usePagination } from '../../hooks/usePagination';
-import { ActivityLogEntry, ActivityAction } from '../../types';
+import { ActivityLogEntry, ActivityAction, Expense, Settlement } from '../../types';
 
 function ActionIcon({ action }: { action: ActivityAction }) {
   const cfg: Record<ActivityAction, { icon: React.ElementType; bg: string; color: string }> = {
@@ -78,11 +78,49 @@ function actionLabel(entry: ActivityLogEntry, myUid: string | undefined): { prim
   }
 }
 
-export function ActivityFeed() {
-  const { activityLogs, user, currentGroupId } = useStore();
-  const { visible, hasMore, loadMore, sentinelRef, remaining } = usePagination(activityLogs, 15, currentGroupId);
+function expenseToEntry(e: Expense): ActivityLogEntry {
+  return {
+    id: `exp-${e.id}`,
+    groupId: e.groupId,
+    action: 'expense_added',
+    actorId: e.createdBy,
+    actorName: e.paidByName,
+    actorPhoto: e.paidByPhoto,
+    targetName: e.title,
+    amount: e.amount,
+    currency: e.currency,
+    timestamp: e.createdAt,
+  };
+}
 
-  if (activityLogs.length === 0) {
+function settlementToEntry(s: Settlement): ActivityLogEntry {
+  return {
+    id: `set-${s.id}`,
+    groupId: s.groupId,
+    action: 'settlement_added',
+    actorId: s.createdBy,
+    actorName: s.fromName,
+    actorPhoto: s.fromPhoto,
+    amount: s.amount,
+    currency: s.currency,
+    extraInfo: s.toName,
+    timestamp: s.settledAt,
+  };
+}
+
+export function ActivityFeed() {
+  const { activityLogs, expenses, settlements, user, currentGroupId } = useStore();
+
+  const entries: ActivityLogEntry[] = activityLogs.length > 0
+    ? activityLogs
+    : [
+        ...expenses.map(expenseToEntry),
+        ...settlements.map(settlementToEntry),
+      ].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+
+  const { visible, hasMore, loadMore, sentinelRef, remaining } = usePagination(entries, 15, currentGroupId);
+
+  if (entries.length === 0) {
     return (
       <EmptyState
         icon={Activity}
@@ -94,7 +132,7 @@ export function ActivityFeed() {
 
   return (
     <div className="space-y-2">
-      {visible.map((entry: ActivityLogEntry) => {
+      {visible.map((entry) => {
         const { primary, secondary } = actionLabel(entry, user?.uid);
         return (
           <div key={entry.id} className="card p-3 flex items-start gap-3">
