@@ -8,6 +8,7 @@ import { useStore } from '../store/useStore';
 import { notify } from '../store/useNotifications';
 import { Group, GroupMember } from '../types';
 import { logError } from '../lib/logger';
+import { writeLog } from '../lib/activityLog';
 
 export function useGroups() {
   const { user, setGroups, setMembers, currentGroupId, addToast } = useStore();
@@ -84,6 +85,7 @@ export function useGroups() {
         joinedAt: new Date().toISOString(),
       });
       await batch.commit();
+      await writeLog(groupRef.id, 'group_created', u, { targetName: name.trim() });
       addToast('تم إنشاء المجموعة بنجاح!', 'success');
       return groupRef.id;
     } catch (error: unknown) {
@@ -93,9 +95,17 @@ export function useGroups() {
     }
   };
 
-  const updateGroup = async (groupId: string, data: Partial<Pick<Group, 'name' | 'description' | 'currency' | 'category' | 'permissions' | 'nicknames' | 'simplifyDebts'>>) => {
+  const updateGroup = async (
+    groupId: string,
+    data: Partial<Pick<Group, 'name' | 'description' | 'currency' | 'category' | 'permissions' | 'nicknames' | 'simplifyDebts'>>,
+    extraInfo?: string
+  ) => {
+    const { user: u } = useStore.getState();
     try {
       await setDoc(doc(db, 'groups', groupId), data, { merge: true });
+      if (u && extraInfo !== undefined) {
+        await writeLog(groupId, 'group_settings_changed', u, { extraInfo });
+      }
       addToast('تم تحديث المجموعة.', 'success');
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -146,6 +156,7 @@ export function useGroups() {
       }
       batch.update(groupRef, update);
       await batch.commit();
+      if (u) await writeLog(groupId, 'member_left', u);
       addToast('غادرت المجموعة.', 'success');
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -180,10 +191,13 @@ export function useGroups() {
         return;
       }
 
+      const { user: u, members: mList } = useStore.getState();
+      const removedMember = mList.find(m => m.uid === memberUid);
       const batch = writeBatch(db);
       batch.delete(doc(db, 'groups', groupId, 'members', memberUid));
       batch.update(groupRef, { memberIds: remaining, memberCount: remaining.length });
       await batch.commit();
+      if (u) await writeLog(groupId, 'member_removed', u, { targetName: removedMember?.displayName });
       addToast('تم إزالة العضو.', 'success');
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -260,6 +274,7 @@ export function useGroups() {
       // Fix 8: Increment usedCount atomically
       batch.update(doc(db, 'invites', code), { usedCount: increment(1) });
       await batch.commit();
+      await writeLog(invite.groupId, 'member_joined', u);
       addToast(`انضممت إلى ${invite.groupName}!`, 'success');
       return true;
     } catch (error: unknown) {

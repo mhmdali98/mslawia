@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { User, Group, GroupMember, Expense, Settlement, Toast } from '../types';
+import { User, Group, GroupMember, Expense, Settlement, Toast, ActivityLogEntry } from '../types';
 
 interface AppState {
   user: User | null;
@@ -9,6 +9,7 @@ interface AppState {
   members: GroupMember[];
   expenses: Expense[];
   settlements: Settlement[];
+  activityLogs: ActivityLogEntry[];
   toasts: Toast[];
   isLoading: boolean;
   groupsLoaded: boolean;
@@ -20,6 +21,7 @@ interface AppState {
   setMembers: (members: GroupMember[]) => void;
   setExpenses: (expenses: Expense[]) => void;
   setSettlements: (settlements: Settlement[]) => void;
+  setActivityLogs: (logs: ActivityLogEntry[]) => void;
   setGroupsLoaded: (loaded: boolean) => void;
   setExpensesLoaded: (loaded: boolean) => void;
   addToast: (message: string, type: Toast['type']) => void;
@@ -37,6 +39,7 @@ export const useStore = create<AppState>()(
       members: [],
       expenses: [],
       settlements: [],
+      activityLogs: [],
       toasts: [],
       isLoading: false,
       groupsLoaded: false,
@@ -48,6 +51,7 @@ export const useStore = create<AppState>()(
       setMembers: (members) => set({ members }),
       setExpenses: (expenses) => set({ expenses }),
       setSettlements: (settlements) => set({ settlements }),
+      setActivityLogs: (activityLogs) => set({ activityLogs }),
       setGroupsLoaded: (groupsLoaded) => set({ groupsLoaded }),
       setExpensesLoaded: (expensesLoaded) => set({ expensesLoaded }),
       addToast: (message, type) => {
@@ -66,6 +70,7 @@ export const useStore = create<AppState>()(
         members: [],
         expenses: [],
         settlements: [],
+        activityLogs: [],
         toasts: [],
         isLoading: false,
         groupsLoaded: false,
