@@ -1,13 +1,15 @@
 // Minimal service worker for Mslawia PWA
 // Cache-first for app shell, network-first for navigation
-const CACHE = 'mslawia-v2';
+const CACHE = 'mslawia-v3';
 const ASSETS = [
   '/mslawia/',
   '/mslawia/index.html',
   '/mslawia/manifest.webmanifest',
   '/mslawia/favicon.svg',
+  '/mslawia/icon-192.png',
+  '/mslawia/icon-512.png',
+  '/mslawia/apple-touch-icon.png',
   '/mslawia/icon-192.svg',
-  '/mslawia/icon-512.svg',
 ];
 
 self.addEventListener('install', (event) => {
@@ -34,8 +36,8 @@ self.addEventListener('message', (event) => {
   self.registration.showNotification(title || 'مصلاوية', {
     body: body || '',
     tag: tag || undefined,
-    icon: '/mslawia/icon-192.svg',
-    badge: '/mslawia/icon-192.svg',
+    icon: '/mslawia/icon-192.png',
+    badge: '/mslawia/icon-192.png',
     dir: 'rtl',
     lang: 'ar',
     vibrate: [120, 60, 120],

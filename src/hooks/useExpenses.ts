@@ -8,6 +8,7 @@ import { useStore } from '../store/useStore';
 import { notify } from '../store/useNotifications';
 import { getCurrency } from '../lib/currencies';
 import { Expense, Settlement, ExpenseSplit } from '../types';
+import { logError } from '../lib/logger';
 
 export interface ExpenseInput {
   title: string;
@@ -76,7 +77,7 @@ export function useExpenses() {
           notify(`${grp?.name || ''} · مصروف جديد`, msg, `exp-${change.doc.id}`);
         }
       },
-      (error) => { console.error('Expenses listener error:', error.code, error.message); }
+      (error) => { logError('useExpenses', `Expenses listener error: ${error.code} ${error.message}`); }
     );
     const unsubSet = onSnapshot(
       setQ,
@@ -96,7 +97,7 @@ export function useExpenses() {
           notify(`${grp?.name || ''} · تسوية جديدة`, msg, `set-${change.doc.id}`);
         }
       },
-      (error) => { console.error('Settlements listener error:', error.code, error.message); }
+      (error) => { logError('useExpenses', `Settlements listener error: ${error.code} ${error.message}`); }
     );
 
     return () => { unsubExp(); unsubSet(); };
@@ -116,24 +117,26 @@ export function useExpenses() {
       addToast('تمت إضافة المصروف!', 'success');
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
-      console.error('addExpense error:', msg);
+      logError('useExpenses', `addExpense error: ${msg}`);
       addToast(`فشل إضافة المصروف: ${msg}`, 'error');
     }
   };
 
   const updateExpense = async (expenseId: string, data: ExpenseInput) => {
-    const { currentGroupId: gid } = useStore.getState();
+    const { currentGroupId: gid, user } = useStore.getState();
     if (!gid) return;
     try {
       const payload = stripUndefined({
         ...data,
         updatedAt: new Date().toISOString(),
+        updatedBy: user?.uid,
+        updatedByName: user?.displayName,
       });
       await setDoc(doc(db, 'groups', gid, 'expenses', expenseId), payload, { merge: true });
       addToast('تم تحديث المصروف.', 'success');
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
-      console.error('updateExpense error:', msg);
+      logError('useExpenses', `updateExpense error: ${msg}`);
       addToast(`فشل تحديث المصروف: ${msg}`, 'error');
     }
   };
@@ -146,7 +149,7 @@ export function useExpenses() {
       addToast('تم حذف المصروف.', 'success');
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
-      console.error('deleteExpense error:', msg);
+      logError('useExpenses', `deleteExpense error: ${msg}`);
       addToast('فشل حذف المصروف.', 'error');
     }
   };
@@ -165,7 +168,7 @@ export function useExpenses() {
       addToast('تم تسجيل التسوية!', 'success');
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
-      console.error('addSettlement error:', msg);
+      logError('useExpenses', `addSettlement error: ${msg}`);
       addToast('فشل تسجيل التسوية.', 'error');
     }
   };
@@ -178,7 +181,7 @@ export function useExpenses() {
       addToast('تم حذف التسوية.', 'success');
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
-      console.error('deleteSettlement error:', msg);
+      logError('useExpenses', `deleteSettlement error: ${msg}`);
       addToast('فشل حذف التسوية.', 'error');
     }
   };
