@@ -27,6 +27,9 @@ export function GroupSettingsModal({ group, onClose }: Props) {
   const [membersCanSettle, setMembersCanSettle] = useState(
     group.permissions?.membersCanSettle !== false
   );
+  const [simplifyDebts, setSimplifyDebts] = useState(
+    group.simplifyDebts !== false
+  );
   const [loading, setLoading] = useState(false);
   const [editingNickname, setEditingNickname] = useState<string | null>(null);
   const [nicknameValue, setNicknameValue] = useState('');
@@ -43,6 +46,7 @@ export function GroupSettingsModal({ group, onClose }: Props) {
       currency,
       category: groupCategory,
       permissions: { membersCanAddExpenses, membersCanSettle },
+      simplifyDebts,
     });
     setLoading(false);
     onClose();
@@ -173,6 +177,28 @@ export function GroupSettingsModal({ group, onClose }: Props) {
                 />
               </label>
               <p className="text-slate-500 text-xs">المنشئ دائماً يمكنه القيام بكل العمليات.</p>
+              <div className="pt-1 border-t border-slate-700">
+                <div className="flex items-center gap-2 text-slate-300 text-sm font-medium mb-2">
+                  <Shield size={14} className="text-emerald-400" />
+                  إعداد الحسابات
+                </div>
+                <label className="flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-800 cursor-pointer">
+                  <div>
+                    <span className="text-slate-300 text-sm">تبسيط الديون</span>
+                    <p className="text-slate-500 text-xs mt-0.5">
+                      {simplifyDebts
+                        ? 'يقلل عدد التحويلات بدمج الديون (مثل Splitwise)'
+                        : 'يُظهر الديون المباشرة بين كل شخصين'}
+                    </p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={simplifyDebts}
+                    onChange={e => setSimplifyDebts(e.target.checked)}
+                    className="w-4 h-4 accent-emerald-500 flex-shrink-0"
+                  />
+                </label>
+              </div>
             </div>
           )}
 

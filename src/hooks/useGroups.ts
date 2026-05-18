@@ -93,7 +93,7 @@ export function useGroups() {
     }
   };
 
-  const updateGroup = async (groupId: string, data: Partial<Pick<Group, 'name' | 'description' | 'currency' | 'category' | 'permissions' | 'nicknames'>>) => {
+  const updateGroup = async (groupId: string, data: Partial<Pick<Group, 'name' | 'description' | 'currency' | 'category' | 'permissions' | 'nicknames' | 'simplifyDebts'>>) => {
     try {
       await setDoc(doc(db, 'groups', groupId), data, { merge: true });
       addToast('تم تحديث المجموعة.', 'success');

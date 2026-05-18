@@ -1,4 +1,4 @@
-import { Expense, Balance, Transfer, GroupMember } from '../types';
+import { Expense, Balance, Transfer, GroupMember, Settlement } from '../types';
 
 export function calculateBalances(
   expenses: Expense[],
@@ -67,6 +67,77 @@ export function calculateMinTransfers(balances: Balance[]): Transfer[] {
 
     if (credit.amount < 0.01) i++;
     if (debt.amount < 0.01) j++;
+  }
+
+  return transfers;
+}
+
+// Non-simplified: keep debts pairwise (who owes whom per actual expenses)
+export function calculateDirectDebts(
+  expenses: Expense[],
+  settlements: Pick<Settlement, 'from' | 'to' | 'amount'>[],
+  members: GroupMember[]
+): Transfer[] {
+  const memberMap: Record<string, { displayName: string; photoURL: string }> = {};
+  members.forEach(m => { memberMap[m.uid] = { displayName: m.displayName, photoURL: m.photoURL }; });
+
+  // raw[from][to] = gross amount from owes to (unsettled)
+  const raw: Record<string, Record<string, number>> = {};
+
+  const add = (from: string, to: string, amount: number) => {
+    if (!raw[from]) raw[from] = {};
+    raw[from][to] = (raw[from][to] || 0) + amount;
+  };
+
+  for (const expense of expenses) {
+    for (const split of expense.splits) {
+      if (split.uid !== expense.paidBy && split.amount > 0.005) {
+        add(split.uid, expense.paidBy, split.amount);
+      }
+    }
+  }
+
+  // Settlements: from paid to → reduces from's debt to to
+  // Model as "to now owes from" (netting removes the debt)
+  for (const s of settlements) {
+    add(s.to, s.from, s.amount);
+  }
+
+  const seen = new Set<string>();
+  const transfers: Transfer[] = [];
+
+  for (const from of Object.keys(raw)) {
+    for (const to of Object.keys(raw[from])) {
+      const key = [from, to].sort().join('~');
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const aOwesB = raw[from]?.[to] || 0;
+      const bOwesA = raw[to]?.[from] || 0;
+      const net = aOwesB - bOwesA;
+
+      if (net > 0.01) {
+        transfers.push({
+          from,
+          fromName: memberMap[from]?.displayName || '',
+          fromPhoto: memberMap[from]?.photoURL || '',
+          to,
+          toName: memberMap[to]?.displayName || '',
+          toPhoto: memberMap[to]?.photoURL || '',
+          amount: Math.round(net * 100) / 100,
+        });
+      } else if (net < -0.01) {
+        transfers.push({
+          from: to,
+          fromName: memberMap[to]?.displayName || '',
+          fromPhoto: memberMap[to]?.photoURL || '',
+          to: from,
+          toName: memberMap[from]?.displayName || '',
+          toPhoto: memberMap[from]?.photoURL || '',
+          amount: Math.round(-net * 100) / 100,
+        });
+      }
+    }
   }
 
   return transfers;
