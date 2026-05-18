@@ -107,3 +107,29 @@ export interface Toast {
   message: string;
   type: 'success' | 'error' | 'info';
 }
+
+export type ActivityAction =
+  | 'expense_added'
+  | 'expense_edited'
+  | 'expense_deleted'
+  | 'settlement_added'
+  | 'settlement_deleted'
+  | 'member_joined'
+  | 'member_left'
+  | 'member_removed'
+  | 'group_settings_changed'
+  | 'group_created';
+
+export interface ActivityLogEntry {
+  id: string;
+  groupId: string;
+  action: ActivityAction;
+  actorId: string;
+  actorName: string;
+  actorPhoto: string;
+  targetName?: string;
+  amount?: number;
+  currency?: string;
+  extraInfo?: string;
+  timestamp: string;
+}

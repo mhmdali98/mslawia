@@ -1,14 +1,15 @@
 import { useEffect, useRef } from 'react';
 import {
   collection, onSnapshot, addDoc, deleteDoc, doc,
-  setDoc, query, orderBy,
+  setDoc, query, orderBy, limit,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useStore } from '../store/useStore';
 import { notify } from '../store/useNotifications';
 import { getCurrency } from '../lib/currencies';
-import { Expense, Settlement, ExpenseSplit } from '../types';
+import { Expense, Settlement, ExpenseSplit, ActivityLogEntry } from '../types';
 import { logError } from '../lib/logger';
+import { writeLog } from '../lib/activityLog';
 
 export interface ExpenseInput {
   title: string;
@@ -41,7 +42,7 @@ function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
 }
 
 export function useExpenses() {
-  const { currentGroupId, setExpenses, setSettlements, addToast } = useStore();
+  const { currentGroupId, setExpenses, setSettlements, setActivityLogs, addToast } = useStore();
   const firstExpSnap = useRef(true);
   const firstSetSnap = useRef(true);
 
@@ -49,6 +50,7 @@ export function useExpenses() {
     if (!currentGroupId) {
       setExpenses([]);
       setSettlements([]);
+      setActivityLogs([]);
       useStore.getState().setExpensesLoaded(false);
       firstExpSnap.current = true;
       firstSetSnap.current = true;
@@ -57,6 +59,11 @@ export function useExpenses() {
 
     const expQ = query(collection(db, 'groups', currentGroupId, 'expenses'), orderBy('date', 'desc'));
     const setQ = query(collection(db, 'groups', currentGroupId, 'settlements'), orderBy('settledAt', 'desc'));
+    const logQ = query(
+      collection(db, 'groups', currentGroupId, 'activityLog'),
+      orderBy('timestamp', 'desc'),
+      limit(100)
+    );
 
     const unsubExp = onSnapshot(
       expQ,
@@ -79,6 +86,7 @@ export function useExpenses() {
       },
       (error) => { logError('useExpenses', `Expenses listener error: ${error.code} ${error.message}`); }
     );
+
     const unsubSet = onSnapshot(
       setQ,
       (snap) => {
@@ -100,8 +108,16 @@ export function useExpenses() {
       (error) => { logError('useExpenses', `Settlements listener error: ${error.code} ${error.message}`); }
     );
 
-    return () => { unsubExp(); unsubSet(); };
-  }, [currentGroupId, setExpenses, setSettlements]);
+    const unsubLog = onSnapshot(
+      logQ,
+      (snap) => {
+        setActivityLogs(snap.docs.map(d => ({ id: d.id, ...d.data() } as ActivityLogEntry)));
+      },
+      (error) => { logError('useExpenses', `ActivityLog listener error: ${error.code} ${error.message}`); }
+    );
+
+    return () => { unsubExp(); unsubSet(); unsubLog(); };
+  }, [currentGroupId, setExpenses, setSettlements, setActivityLogs]);
 
   const addExpense = async (data: ExpenseInput) => {
     const { currentGroupId: gid, user } = useStore.getState();
@@ -114,6 +130,11 @@ export function useExpenses() {
         createdAt: new Date().toISOString(),
       });
       await addDoc(collection(db, 'groups', gid, 'expenses'), payload);
+      await writeLog(gid, 'expense_added', user, {
+        targetName: data.title,
+        amount: data.amount,
+        currency: data.currency,
+      });
       addToast('تمت إضافة المصروف!', 'success');
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -133,6 +154,13 @@ export function useExpenses() {
         updatedByName: user?.displayName,
       });
       await setDoc(doc(db, 'groups', gid, 'expenses', expenseId), payload, { merge: true });
+      if (user) {
+        await writeLog(gid, 'expense_edited', user, {
+          targetName: data.title,
+          amount: data.amount,
+          currency: data.currency,
+        });
+      }
       addToast('تم تحديث المصروف.', 'success');
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -142,10 +170,18 @@ export function useExpenses() {
   };
 
   const deleteExpense = async (expenseId: string) => {
-    const { currentGroupId: gid } = useStore.getState();
+    const { currentGroupId: gid, user, expenses } = useStore.getState();
     if (!gid) return;
+    const expense = expenses.find(e => e.id === expenseId);
     try {
       await deleteDoc(doc(db, 'groups', gid, 'expenses', expenseId));
+      if (user && expense) {
+        await writeLog(gid, 'expense_deleted', user, {
+          targetName: expense.title,
+          amount: expense.amount,
+          currency: expense.currency,
+        });
+      }
       addToast('تم حذف المصروف.', 'success');
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -165,6 +201,11 @@ export function useExpenses() {
         settledAt: new Date().toISOString(),
       });
       await addDoc(collection(db, 'groups', gid, 'settlements'), payload);
+      await writeLog(gid, 'settlement_added', user, {
+        amount: data.amount,
+        currency: data.currency,
+        extraInfo: data.toName,
+      });
       addToast('تم تسجيل التسوية!', 'success');
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -174,10 +215,18 @@ export function useExpenses() {
   };
 
   const deleteSettlement = async (settlementId: string) => {
-    const { currentGroupId: gid } = useStore.getState();
+    const { currentGroupId: gid, user, settlements } = useStore.getState();
     if (!gid) return;
+    const settlement = settlements.find(s => s.id === settlementId);
     try {
       await deleteDoc(doc(db, 'groups', gid, 'settlements', settlementId));
+      if (user && settlement) {
+        await writeLog(gid, 'settlement_deleted', user, {
+          amount: settlement.amount,
+          currency: settlement.currency,
+          extraInfo: settlement.toName,
+        });
+      }
       addToast('تم حذف التسوية.', 'success');
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);

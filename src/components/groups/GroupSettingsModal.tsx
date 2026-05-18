@@ -47,7 +47,7 @@ export function GroupSettingsModal({ group, onClose }: Props) {
       category: groupCategory,
       permissions: { membersCanAddExpenses, membersCanSettle },
       simplifyDebts,
-    });
+    }, 'الإعدادات العامة');
     setLoading(false);
     onClose();
   };
@@ -60,7 +60,7 @@ export function GroupSettingsModal({ group, onClose }: Props) {
     } else {
       delete updated[uid];
     }
-    await updateGroup(group.id, { nicknames: updated });
+    await updateGroup(group.id, { nicknames: updated }, 'الألقاب');
     setEditingNickname(null);
   };
 
