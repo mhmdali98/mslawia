@@ -35,6 +35,7 @@ export interface Expense {
   groupId: string;
   title: string;
   amount: number;
+  currency: string;
   paidBy: string;
   paidByName: string;
   paidByPhoto: string;
@@ -42,7 +43,9 @@ export interface Expense {
   splitType: SplitType;
   date: string;
   note?: string;
+  createdBy: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface Settlement {
@@ -55,8 +58,10 @@ export interface Settlement {
   toName: string;
   toPhoto: string;
   amount: number;
+  currency: string;
   settledAt: string;
   note?: string;
+  createdBy: string;
 }
 
 export interface Invite {

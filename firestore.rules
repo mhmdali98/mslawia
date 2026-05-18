@@ -11,37 +11,52 @@ service cloud.firestore {
         exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid));
     }
 
+    function isGroupOwner(groupId) {
+      return isAuth() &&
+        get(/databases/$(database)/documents/groups/$(groupId)).data.createdBy == request.auth.uid;
+    }
+
     match /users/{userId} {
       allow read: if isAuth();
       allow write: if request.auth.uid == userId;
     }
 
     match /groups/{groupId} {
-      // get (single doc): any authenticated user can read by ID — needed for invite join flow
-      // list (collection query): only members can query their groups
+      // get: any auth user can fetch a group by ID (needed for invite join flow)
+      // list: only members can query their groups
       allow get: if isAuth();
       allow list: if isAuth() && request.auth.uid in resource.data.memberIds;
-      allow create: if isAuth();
-      // allow existing members to update, OR allow joining (user adds themselves to memberIds)
+      allow create: if isAuth() && request.resource.data.createdBy == request.auth.uid;
+      // existing member updates OR self-join (user adds self to memberIds)
       allow update: if isAuth() && (
         request.auth.uid in resource.data.memberIds ||
         request.auth.uid in request.resource.data.memberIds
       );
-      allow delete: if isAuth() && resource.data.createdBy == request.auth.uid;
+      allow delete: if isGroupOwner(groupId);
 
       match /members/{memberId} {
         allow read: if isMemberOf(groupId);
-        allow create: if isAuth();
-        allow delete: if isAuth() && request.auth.uid == memberId;
+        // user can add only themselves (invite/create flow)
+        // existing members can remove others only via owner
+        allow create: if isAuth() && request.auth.uid == memberId;
+        allow delete: if isAuth() && (
+          request.auth.uid == memberId || isGroupOwner(groupId)
+        );
       }
 
       match /expenses/{expenseId} {
         allow read, create: if isMemberOf(groupId);
-        allow update, delete: if isAuth() && resource.data.paidBy == request.auth.uid;
+        // payer or original creator can edit/delete their expense
+        allow update, delete: if isAuth() && (
+          resource.data.paidBy == request.auth.uid ||
+          resource.data.createdBy == request.auth.uid
+        );
       }
 
       match /settlements/{settlementId} {
-        allow read, create, update: if isMemberOf(groupId);
+        allow read, create: if isMemberOf(groupId);
+        // only creator can edit/delete a settlement
+        allow update, delete: if isAuth() && resource.data.createdBy == request.auth.uid;
       }
     }
 

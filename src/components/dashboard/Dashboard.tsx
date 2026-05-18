@@ -6,6 +6,7 @@ import { useGroups } from '../../hooks/useGroups';
 import { GroupCard } from '../groups/GroupCard';
 import { CreateGroupModal } from '../groups/CreateGroupModal';
 import { EmptyState } from '../ui/EmptyState';
+import { Avatar } from '../ui/Avatar';
 
 export function Dashboard() {
   const { user, groups } = useStore();
@@ -22,12 +23,8 @@ export function Dashboard() {
             <h1 className="text-xl font-bold text-white">مصاريا</h1>
           </div>
           <div className="flex items-center gap-2">
-            {user?.photoURL && (
-              <img
-                src={user.photoURL}
-                alt={user.displayName}
-                className="w-8 h-8 rounded-full ring-2 ring-slate-700"
-              />
+            {user && (
+              <Avatar uid={user.uid} name={user.displayName} photoURL={user.photoURL} size="sm" className="ring-2 ring-slate-700" />
             )}
             <button
               onClick={logout}
