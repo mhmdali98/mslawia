@@ -1,10 +1,12 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import {
   collection, onSnapshot, addDoc, deleteDoc, doc,
   setDoc, query, orderBy,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useStore } from '../store/useStore';
+import { notify } from '../store/useNotifications';
+import { getCurrency } from '../lib/currencies';
 import { Expense, Settlement, ExpenseSplit } from '../types';
 
 export interface ExpenseInput {
@@ -39,12 +41,16 @@ function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
 
 export function useExpenses() {
   const { currentGroupId, setExpenses, setSettlements, addToast } = useStore();
+  const firstExpSnap = useRef(true);
+  const firstSetSnap = useRef(true);
 
   useEffect(() => {
     if (!currentGroupId) {
       setExpenses([]);
       setSettlements([]);
       useStore.getState().setExpensesLoaded(false);
+      firstExpSnap.current = true;
+      firstSetSnap.current = true;
       return;
     }
 
@@ -56,12 +62,40 @@ export function useExpenses() {
       (snap) => {
         setExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() } as Expense)));
         useStore.getState().setExpensesLoaded(true);
+        if (firstExpSnap.current) { firstExpSnap.current = false; return; }
+        const { user, groups: gs } = useStore.getState();
+        const grp = gs.find(g => g.id === currentGroupId);
+        const sym = getCurrency(grp?.currency || 'USD').symbol;
+        for (const change of snap.docChanges()) {
+          if (change.type !== 'added') continue;
+          const e = change.doc.data() as Expense;
+          if (!user || e.createdBy === user.uid) continue;
+          if (snap.metadata.hasPendingWrites) continue;
+          const msg = `${e.paidByName}: ${e.title} (${e.amount.toFixed(2)} ${sym})`;
+          addToast(`مصروف جديد · ${msg}`, 'info');
+          notify(`${grp?.name || ''} · مصروف جديد`, msg, `exp-${change.doc.id}`);
+        }
       },
       (error) => { console.error('Expenses listener error:', error.code, error.message); }
     );
     const unsubSet = onSnapshot(
       setQ,
-      (snap) => { setSettlements(snap.docs.map(d => ({ id: d.id, ...d.data() } as Settlement))); },
+      (snap) => {
+        setSettlements(snap.docs.map(d => ({ id: d.id, ...d.data() } as Settlement)));
+        if (firstSetSnap.current) { firstSetSnap.current = false; return; }
+        const { user, groups: gs } = useStore.getState();
+        const grp = gs.find(g => g.id === currentGroupId);
+        const sym = getCurrency(grp?.currency || 'USD').symbol;
+        for (const change of snap.docChanges()) {
+          if (change.type !== 'added') continue;
+          const s = change.doc.data() as Settlement;
+          if (!user || s.createdBy === user.uid) continue;
+          if (snap.metadata.hasPendingWrites) continue;
+          const msg = `${s.fromName} → ${s.toName} (${s.amount.toFixed(2)} ${sym})`;
+          addToast(`تسوية جديدة · ${msg}`, 'info');
+          notify(`${grp?.name || ''} · تسوية جديدة`, msg, `set-${change.doc.id}`);
+        }
+      },
       (error) => { console.error('Settlements listener error:', error.code, error.message); }
     );
 

@@ -13,6 +13,7 @@ import { ToastContainer } from './components/ui/Toast';
 import { FullPageLoader } from './components/ui/LoadingSpinner';
 import { ConfirmDialog } from './components/ui/ConfirmDialog';
 import { OfflineBanner } from './components/ui/OfflineBanner';
+import { InstallPrompt } from './components/ui/InstallPrompt';
 
 function AppRoutes() {
   const { user } = useStore();
@@ -47,6 +48,7 @@ export default function App() {
       <AppRoutes />
       <ToastContainer />
       <ConfirmDialog />
+      <InstallPrompt />
     </BrowserRouter>
   );
 }
