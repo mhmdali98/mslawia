@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, ChevronDown } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useExpenses, ExpenseInput } from '../../hooks/useExpenses';
+
 import { splitEqually } from '../../lib/calculations';
 import { getCurrency } from '../../lib/currencies';
 import { EXPENSE_CATEGORIES } from '../../lib/categories';
@@ -16,7 +17,7 @@ interface Props {
 }
 
 export function ExpenseFormModal({ onClose, expense, defaultCurrency = 'USD' }: Props) {
-  const { user, members, addToast } = useStore();
+  const { user, members, addToast, settlements } = useStore();
   const { addExpense, updateExpense } = useExpenses();
   const isEdit = !!expense;
 
@@ -154,6 +155,11 @@ export function ExpenseFormModal({ onClose, expense, defaultCurrency = 'USD' }: 
         </div>
 
         <div className="space-y-4">
+          {isEdit && settlements.length > 0 && (
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs mb-2">
+              تعديل هذا المصروف قد يغير الأرصدة الحالية
+            </div>
+          )}
           <div>
             <label className="label">اسم المصروف *</label>
             <input className="input" placeholder="مثال: عشاء، تاكسي، بقالة..." value={title} onChange={e => setTitle(e.target.value)} />

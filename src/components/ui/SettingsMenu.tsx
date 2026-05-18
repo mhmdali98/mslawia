@@ -51,6 +51,8 @@ export function SettingsMenu() {
     setOpen(false);
   };
 
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+
   return (
     <div className="relative" ref={ref}>
       <button
@@ -75,20 +77,21 @@ export function SettingsMenu() {
           {installed ? (
             <div className="w-full flex items-center gap-2 px-4 py-3 text-sm text-slate-500">
               <Check size={15} className="text-emerald-400" />
-              <span className="flex-1 text-right">التطبيق مثبّت</span>
+              <span className="flex-1 text-right">التطبيق مثبّت ✓</span>
             </div>
-          ) : (
+          ) : deferred ? (
             <button
               onClick={handleInstall}
-              disabled={!deferred}
-              className="w-full flex items-center gap-2 px-4 py-3 text-sm text-slate-300 hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+              className="w-full flex items-center gap-2 px-4 py-3 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
             >
-              <Download size={15} className={deferred ? 'text-emerald-400' : ''} />
-              <span className="flex-1 text-right">
-                {deferred ? 'تثبيت التطبيق' : 'تثبيت غير متاح'}
-              </span>
+              <Download size={15} className="text-emerald-400" />
+              <span className="flex-1 text-right">تثبيت التطبيق</span>
             </button>
-          )}
+          ) : isIOS ? (
+            <p className="px-4 py-2 text-xs text-slate-500">
+              لتثبيت على iPhone: اضغط مشاركة ثم أضف إلى الشاشة الرئيسية
+            </p>
+          ) : null}
           <div className="border-t border-slate-700" />
           <div className="px-4 py-3">
             <div className="flex items-center gap-2 text-slate-400 text-xs mb-2">

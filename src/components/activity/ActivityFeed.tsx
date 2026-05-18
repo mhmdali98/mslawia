@@ -8,6 +8,7 @@ import { EmptyState } from '../ui/EmptyState';
 import { Avatar } from '../ui/Avatar';
 import { usePagination } from '../../hooks/usePagination';
 import { Expense, Settlement } from '../../types';
+import { useT } from '../../lib/i18n';
 
 type ActivityItem =
   | { type: 'expense'; data: Expense; timestamp: string }
@@ -15,6 +16,7 @@ type ActivityItem =
 
 export function ActivityFeed() {
   const { expenses, settlements, user, groups, currentGroupId } = useStore();
+  const t = useT();
 
   const group = groups.find(g => g.id === currentGroupId);
   const groupCurrency = group?.currency || 'USD';
@@ -30,8 +32,8 @@ export function ActivityFeed() {
     return (
       <EmptyState
         icon={Activity}
-        title="لا يوجد نشاط"
-        description="أضف مصاريف أو سجّل تسويات لتظهر هنا"
+        title={t('activityEmpty')}
+        description={t('activityEmptyDesc')}
       />
     );
   }
@@ -57,12 +59,12 @@ export function ActivityFeed() {
                   <span className="font-medium">
                     {isPayer ? 'أنت' : e.paidByName}
                   </span>
-                  <span className="text-slate-400"> أضاف </span>
+                  <span className="text-slate-400"> {t('activityAddedExpense')} </span>
                   <span className="font-medium text-white">"{e.title}"</span>
                 </p>
                 {myShare && (
                   <p className={`text-xs mt-0.5 ${isPayer ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {isPayer ? `دفعت ${e.amount.toFixed(2)} ${symbol}` : `حصتك ${myShare.amount.toFixed(2)} ${symbol}`}
+                    {isPayer ? `${t('youPaid')} ${e.amount.toFixed(2)} ${symbol}` : `${t('yourShare')} ${myShare.amount.toFixed(2)} ${symbol}`}
                   </p>
                 )}
                 <p className="text-slate-600 text-xs mt-0.5">
@@ -89,7 +91,7 @@ export function ActivityFeed() {
             <div className="flex-1 min-w-0">
               <p className="text-slate-200 text-sm leading-snug">
                 <span className="font-medium">{isFrom ? 'أنت' : s.fromName}</span>
-                <span className="text-slate-400"> دفع لـ </span>
+                <span className="text-slate-400"> {t('paidLabel')} </span>
                 <span className="font-medium">{isTo ? 'أنت' : s.toName}</span>
               </p>
               {s.note && <p className="text-slate-500 text-xs mt-0.5 italic">{s.note}</p>}
