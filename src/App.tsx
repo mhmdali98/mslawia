@@ -8,9 +8,11 @@ import { useGroups } from './hooks/useGroups';
 import { LoginPage } from './components/auth/LoginPage';
 import { Dashboard } from './components/dashboard/Dashboard';
 import { GroupPage } from './components/groups/GroupPage';
+import { JoinPage } from './components/groups/JoinPage';
 import { ToastContainer } from './components/ui/Toast';
 import { FullPageLoader } from './components/ui/LoadingSpinner';
 import { ConfirmDialog } from './components/ui/ConfirmDialog';
+import { OfflineBanner } from './components/ui/OfflineBanner';
 
 function AppRoutes() {
   const { user } = useStore();
@@ -23,6 +25,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/" element={<Dashboard />} />
       <Route path="/group/:groupId" element={<GroupPage />} />
+      <Route path="/join/:code" element={<JoinPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
@@ -40,6 +43,7 @@ export default function App() {
 
   return (
     <BrowserRouter basename="/mslawia">
+      <OfflineBanner />
       <AppRoutes />
       <ToastContainer />
       <ConfirmDialog />

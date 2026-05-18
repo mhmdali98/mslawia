@@ -60,11 +60,12 @@ export function GroupPage() {
   const handleCopyInvite = async () => {
     const code = await createInvite(group.id, group.name);
     if (code) {
+      const link = `${window.location.origin}/mslawia/join/${code}`;
       try {
-        await navigator.clipboard.writeText(code);
-        addToast(`رمز الدعوة: ${code} — تم النسخ!`, 'success');
+        await navigator.clipboard.writeText(link);
+        addToast('تم نسخ رابط الدعوة!', 'success');
       } catch {
-        addToast(`رمز الدعوة: ${code}`, 'info');
+        addToast(`رابط الدعوة: ${link}`, 'info');
       }
     }
   };

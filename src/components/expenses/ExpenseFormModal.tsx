@@ -23,14 +23,25 @@ export function ExpenseFormModal({ onClose, expense, defaultCurrency = 'USD' }: 
   const [title, setTitle] = useState(expense?.title || '');
   const [amount, setAmount] = useState(expense?.amount.toString() || '');
   const [paidBy, setPaidBy] = useState(expense?.paidBy || user?.uid || '');
-  const [splitType, setSplitType] = useState<'equal' | 'custom'>(
-    (expense?.splitType === 'percentage' ? 'equal' : expense?.splitType) || 'equal'
+  const [splitType, setSplitType] = useState<'equal' | 'custom' | 'percentage'>(
+    expense?.splitType || 'equal'
   );
   const [selectedMembers, setSelectedMembers] = useState<string[]>(
     expense?.splits.map(s => s.uid) || []
   );
   const [customAmounts, setCustomAmounts] = useState<Record<string, string>>(
     expense?.splits.reduce((acc, s) => ({ ...acc, [s.uid]: s.amount.toString() }), {}) || {}
+  );
+  const [percentages, setPercentages] = useState<Record<string, string>>(
+    expense?.splitType === 'percentage' && expense?.splits
+      ? (() => {
+          const total = expense.amount;
+          return expense.splits.reduce((acc, s) => ({
+            ...acc,
+            [s.uid]: total > 0 ? ((s.amount / total) * 100).toFixed(1) : '0',
+          }), {});
+        })()
+      : {}
   );
   const [date, setDate] = useState(expense?.date || new Date().toISOString().slice(0, 10));
   const [category, setCategory] = useState(expense?.category || 'other');
@@ -62,6 +73,11 @@ export function ExpenseFormModal({ onClose, expense, defaultCurrency = 'USD' }: 
     0
   );
 
+  const percentageTotal = selectedMembers.reduce(
+    (sum, uid) => sum + (parseFloat(percentages[uid] || '0') || 0),
+    0
+  );
+
   const handleSubmit = async () => {
     if (!title.trim()) { addToast('أدخل اسم المصروف.', 'error'); return; }
     const amt = parseFloat(amount);
@@ -73,6 +89,20 @@ export function ExpenseFormModal({ onClose, expense, defaultCurrency = 'USD' }: 
     if (splitType === 'equal') {
       const dist = splitEqually(amt, selectedMembers);
       splits = selectedMembers.map(uid => ({ uid, amount: dist[uid] }));
+    } else if (splitType === 'percentage') {
+      if (Math.abs(percentageTotal - 100) > 0.1) {
+        addToast(`مجموع النسب (${percentageTotal.toFixed(1)}%) يجب أن يساوي 100%.`, 'error');
+        return;
+      }
+      let remaining = amt;
+      splits = selectedMembers.map((uid, idx) => {
+        const pct = parseFloat(percentages[uid] || '0') / 100;
+        const share = idx === selectedMembers.length - 1
+          ? Math.round(remaining * 100) / 100
+          : Math.round(amt * pct * 100) / 100;
+        remaining -= share;
+        return { uid, amount: share };
+      });
     } else {
       if (Math.abs(customTotal - amt) > 0.01) {
         addToast(`مجموع المبالغ (${customTotal.toFixed(2)}) لا يساوي الإجمالي (${amt.toFixed(2)}).`, 'error');
@@ -182,17 +212,21 @@ export function ExpenseFormModal({ onClose, expense, defaultCurrency = 'USD' }: 
           <div>
             <label className="label">طريقة التقسيم</label>
             <div className="flex gap-2">
-              {(['equal', 'custom'] as const).map(type => (
+              {([
+                { key: 'equal', label: 'متساوٍ' },
+                { key: 'percentage', label: 'نسب %' },
+                { key: 'custom', label: 'مخصص' },
+              ] as const).map(({ key, label }) => (
                 <button
-                  key={type}
-                  onClick={() => setSplitType(type)}
+                  key={key}
+                  onClick={() => setSplitType(key)}
                   className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-colors ${
-                    splitType === type
+                    splitType === key
                       ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
                       : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
                   }`}
                 >
-                  {type === 'equal' ? 'تقسيم متساوٍ' : 'مبالغ مخصصة'}
+                  {label}
                 </button>
               ))}
             </div>
@@ -227,6 +261,25 @@ export function ExpenseFormModal({ onClose, expense, defaultCurrency = 'USD' }: 
                     {checked && splitType === 'equal' && (
                       <span className="text-slate-400 text-xs">{equalShare} {currencySymbol}</span>
                     )}
+                    {checked && splitType === 'percentage' && (
+                      <div className="flex items-center gap-1">
+                        <input
+                          className="w-16 bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-sm text-white text-center"
+                          type="number"
+                          placeholder="0"
+                          min="0"
+                          max="100"
+                          step="1"
+                          value={percentages[m.uid] || ''}
+                          onChange={e => {
+                            e.stopPropagation();
+                            setPercentages(prev => ({ ...prev, [m.uid]: e.target.value }));
+                          }}
+                          onClick={e => e.stopPropagation()}
+                        />
+                        <span className="text-slate-400 text-xs">%</span>
+                      </div>
+                    )}
                     {checked && splitType === 'custom' && (
                       <input
                         className="w-20 bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-sm text-white text-center"
@@ -249,6 +302,11 @@ export function ExpenseFormModal({ onClose, expense, defaultCurrency = 'USD' }: 
             {splitType === 'custom' && amount && (
               <p className={`text-xs mt-2 ${Math.abs(customTotal - parseFloat(amount)) < 0.01 ? 'text-emerald-400' : 'text-red-400'}`}>
                 المجموع: {customTotal.toFixed(2)} {currencySymbol} من أصل {parseFloat(amount).toFixed(2)} {currencySymbol}
+              </p>
+            )}
+            {splitType === 'percentage' && selectedMembers.length > 0 && (
+              <p className={`text-xs mt-2 ${Math.abs(percentageTotal - 100) < 0.1 ? 'text-emerald-400' : 'text-red-400'}`}>
+                المجموع: {percentageTotal.toFixed(1)}% من أصل 100%
               </p>
             )}
           </div>
