@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowRight, Plus, Users, Receipt, ArrowLeftRight,
-  Copy, Trash2, LogOut, Download, MoreVertical, Settings, Activity, BarChart3,
+  ArrowRight, Plus, Receipt, Home, MoreHorizontal,
+  Copy, Trash2, LogOut, Download, MoreVertical, Settings, Activity, BarChart3, History,
+  CheckCircle, ArrowLeftRight,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useGroups } from '../../hooks/useGroups';
@@ -14,26 +15,30 @@ import { ExpenseFormModal } from '../expenses/ExpenseFormModal';
 import { SettlementsView } from '../settlements/SettlementsView';
 import { EmptyState } from '../ui/EmptyState';
 import { Avatar } from '../ui/Avatar';
+import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { GroupSettingsModal } from './GroupSettingsModal';
 import { ActivityFeed } from '../activity/ActivityFeed';
 import { GroupStats } from './GroupStats';
 import { getGroupCategory } from '../../lib/categories';
+import { getExpenseCategory } from '../../lib/categories';
 import { confirmAction } from '../../store/useConfirm';
-import { usePagination } from '../../hooks/usePagination';
 import { useNickname } from '../../hooks/useNickname';
 
-type Tab = 'expenses' | 'balances' | 'settlements' | 'activity' | 'stats';
+type Tab = 'home' | 'expenses' | 'more';
+type MoreSubTab = 'activity' | 'stats' | 'history';
 
 export function GroupPage() {
   const { groupId } = useParams<{ groupId: string }>();
   const navigate = useNavigate();
-  const { user, groups, members, expenses, settlements, currentGroupId, setCurrentGroupId, addToast } = useStore();
+  const { user, groups, members, expenses, settlements, setCurrentGroupId, addToast, cacheGroupBalance } = useStore();
   const { createInvite, deleteGroup, leaveGroup } = useGroups();
-  const { exportBackup } = useExpenses();
-  const [tab, setTab] = useState<Tab>('expenses');
+  const { exportBackup, addSettlement } = useExpenses();
+  const [tab, setTab] = useState<Tab>('home');
+  const [moreTab, setMoreTab] = useState<MoreSubTab>('activity');
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [settlingKey, setSettlingKey] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -65,6 +70,7 @@ export function GroupPage() {
 
   const isOwner = group.createdBy === user?.uid;
   const canAddExpense = isOwner || group.permissions?.membersCanAddExpenses !== false;
+  const canSettle = isOwner || group.permissions?.membersCanSettle !== false;
   const symbol = getCurrency(group.currency).symbol;
   const groupCat = getGroupCategory(group.category);
   const GroupCatIcon = groupCat.icon;
@@ -75,6 +81,42 @@ export function GroupPage() {
     ? calculateMinTransfers(balances)
     : calculateDirectDebts(expenses, settlementsData, members);
   const getNickname = useNickname(group.id);
+
+  const myBalance = balances.find(b => b.uid === user?.uid);
+  const myDebts = transfers.filter(t => t.from === user?.uid);
+  const myCredits = transfers.filter(t => t.to === user?.uid);
+
+  // Cache user's balance for Dashboard display
+  useEffect(() => {
+    if (user && group && myBalance) {
+      cacheGroupBalance(group.id, myBalance.amount, group.currency);
+    }
+  }, [user, group?.id, group?.currency, myBalance?.amount]);
+
+  const handleQuickSettle = async (transfer: typeof transfers[number]) => {
+    const key = `${transfer.from}-${transfer.to}`;
+    const targetName = transfer.to === user?.uid
+      ? getNickname(transfer.from, transfer.fromName)
+      : getNickname(transfer.to, transfer.toName);
+    const ok = await confirmAction({
+      title: 'تأكيد الدفعة',
+      description: `سجّل دفعة بمبلغ ${transfer.amount.toFixed(2)} ${symbol} ${transfer.from === user?.uid ? `لـ ${targetName}` : `من ${targetName}`}؟`,
+      confirmLabel: 'تأكيد',
+    });
+    if (!ok) return;
+    setSettlingKey(key);
+    await addSettlement({
+      from: transfer.from,
+      fromName: transfer.fromName,
+      fromPhoto: transfer.fromPhoto,
+      to: transfer.to,
+      toName: transfer.toName,
+      toPhoto: transfer.toPhoto,
+      amount: transfer.amount,
+      currency: group.currency,
+    });
+    setSettlingKey(null);
+  };
 
   const handleCopyInvite = async () => {
     const code = await createInvite(group.id, group.name);
@@ -113,11 +155,10 @@ export function GroupPage() {
     navigate('/');
   };
 
-  const myBalance = balances.find(b => b.uid === user?.uid);
-  const myTransfers = transfers.filter(t => t.from === user?.uid || t.to === user?.uid);
-  const [selectedBalance, setSelectedBalance] = useState<string | null>(null);
-  const balancesPage = usePagination(balances, 10, currentGroupId);
-  const balanceTransfersPage = usePagination(transfers, 10, currentGroupId);
+  // Recent 5 expenses sorted newest first
+  const recentExpenses = [...expenses]
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 5);
 
   return (
     <div className="min-h-screen bg-slate-950">
@@ -138,7 +179,14 @@ export function GroupPage() {
               <p className="text-slate-500 text-xs">{members.length} أعضاء · {group.currency}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <button
+              onClick={handleCopyInvite}
+              aria-label="دعوة عضو"
+              className="p-2 rounded-xl text-slate-400 hover:text-emerald-400 hover:bg-slate-800 transition-colors"
+            >
+              <Copy size={18} />
+            </button>
             {canAddExpense && (
               <button
                 onClick={() => setShowAddExpense(true)}
@@ -157,12 +205,6 @@ export function GroupPage() {
               </button>
               {showMenu && (
                 <div className="absolute left-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-xl min-w-[200px] z-50 overflow-hidden">
-                  <button
-                    onClick={() => { handleCopyInvite(); setShowMenu(false); }}
-                    className="w-full flex items-center gap-2 px-4 py-3 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
-                  >
-                    <Copy size={15} /> دعوة عضو
-                  </button>
                   <button
                     onClick={() => { setShowSettings(true); setShowMenu(false); }}
                     className="w-full flex items-center gap-2 px-4 py-3 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
@@ -197,180 +239,185 @@ export function GroupPage() {
         </div>
       </header>
 
-      {myBalance && Math.abs(myBalance.amount) > 0.01 && (
-        <div className="max-w-2xl mx-auto px-4 pt-4">
-          <div className={`rounded-2xl p-4 border ${
-            myBalance.amount > 0
-              ? 'bg-emerald-500/10 border-emerald-500/20'
-              : 'bg-red-500/10 border-red-500/20'
-          }`}>
-            <p className="text-sm font-medium mb-1 text-slate-300">رصيدك في المجموعة</p>
-            <p className={`text-2xl font-bold ${myBalance.amount > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-              {myBalance.amount > 0 ? '+' : ''}{myBalance.amount.toFixed(2)} {symbol}
-            </p>
-            {myTransfers.length > 0 && (
-              <p className="text-xs text-slate-500 mt-1">
-                {myBalance.amount > 0
-                  ? `${myTransfers.filter(t => t.to === user?.uid).length} شخص يدين لك`
-                  : `تحتاج لدفع ${myTransfers.filter(t => t.from === user?.uid).length} شخص`}
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-
       <div className="max-w-2xl mx-auto px-4 pt-4 pb-8">
-        <div className="flex gap-1 bg-slate-900 border border-slate-800 p-1 rounded-xl mb-6 overflow-x-auto scrollbar-none">
+        <div className="flex gap-1 bg-slate-900 border border-slate-800 p-1 rounded-xl mb-5">
           {([
+            { key: 'home', label: 'الرئيسية', icon: Home },
             { key: 'expenses', label: 'المصاريف', icon: Receipt },
-            { key: 'balances', label: 'الأرصدة', icon: Users },
-            { key: 'settlements', label: 'التسويات', icon: ArrowLeftRight },
-            { key: 'activity', label: 'النشاط', icon: Activity },
-            { key: 'stats', label: 'إحصائيات', icon: BarChart3 },
+            { key: 'more', label: 'المزيد', icon: MoreHorizontal },
           ] as const).map(({ key, label, icon: Icon }) => (
             <button
               key={key}
               onClick={() => setTab(key)}
-              className={`flex-1 flex-shrink-0 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-sm font-medium transition-colors ${
                 tab === key ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-300'
               }`}
             >
-              <Icon size={15} />
+              <Icon size={16} />
               {label}
             </button>
           ))}
         </div>
 
-        {tab === 'expenses' && <ExpenseList />}
-
-        {tab === 'balances' && (
-          <div className="space-y-3">
-            {balances.length === 0 || balances.every(b => Math.abs(b.amount) < 0.01) ? (
-              <EmptyState icon={Users} title="جميع الأرصدة مسوّاة" description="لا يوجد ديون حالياً في المجموعة" />
+        {tab === 'home' && (
+          <div className="space-y-5">
+            {/* My balance card */}
+            {myBalance && Math.abs(myBalance.amount) > 0.01 ? (
+              <div className={`rounded-2xl p-4 border ${
+                myBalance.amount > 0
+                  ? 'bg-emerald-500/10 border-emerald-500/20'
+                  : 'bg-red-500/10 border-red-500/20'
+              }`}>
+                <p className="text-sm font-medium mb-1 text-slate-300">رصيدك في المجموعة</p>
+                <p className={`text-2xl font-bold ${myBalance.amount > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {myBalance.amount > 0 ? '+' : ''}{myBalance.amount.toFixed(2)} {symbol}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  {myBalance.amount > 0
+                    ? `${myCredits.length} شخص يدين لك`
+                    : `تحتاج لدفع ${myDebts.length} شخص`}
+                </p>
+              </div>
             ) : (
-              <>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-slate-500">
-                    {simplify ? 'تبسيط الديون: مفعّل' : 'تبسيط الديون: معطّل'}
-                  </span>
-                  {isOwner && (
-                    <button
-                      onClick={() => setShowSettings(true)}
-                      className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
-                    >
-                      تغيير
-                    </button>
-                  )}
-                </div>
-                {new Set(expenses.map(e => e.currency || group.currency)).size > 1 && (
-                  <div className="mb-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs">
-                    تحتوي المجموعة على مصاريف بعملات مختلفة — الأرصدة المعروضة تجمع كل العملات بدون تحويل
-                  </div>
-                )}
-                {balancesPage.visible.map(b => {
-                  const isSelected = selectedBalance === b.uid;
-                  const owes = transfers.filter(t => t.from === b.uid);
-                  const owedBy = transfers.filter(t => t.to === b.uid);
-                  const hasDetail = owes.length > 0 || owedBy.length > 0;
+              <div className="rounded-2xl p-4 border bg-slate-900 border-slate-800">
+                <p className="text-emerald-400 font-bold flex items-center gap-2">
+                  <CheckCircle size={18} />
+                  جميع أرصدتك مسوّاة
+                </p>
+              </div>
+            )}
+
+            {/* Quick pay buttons for my debts */}
+            {canSettle && myDebts.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-slate-400 text-xs font-medium">دفعات مقترحة</h3>
+                {myDebts.map((t) => {
+                  const key = `${t.from}-${t.to}`;
                   return (
-                    <div key={b.uid}>
-                      <button
-                        onClick={() => setSelectedBalance(isSelected ? null : b.uid)}
-                        className={`card p-4 flex items-center gap-3 w-full text-right transition-colors ${hasDetail ? 'hover:bg-slate-800/60 cursor-pointer' : 'cursor-default'} ${isSelected ? 'ring-1 ring-slate-600' : ''}`}
-                      >
-                        <Avatar uid={b.uid} name={b.displayName} photoURL={b.photoURL} size="md" />
-                        <div className="flex-1">
-                          <p className="text-white font-medium text-sm">
-                            {b.uid === user?.uid ? 'أنت' : getNickname(b.uid, b.displayName)}
-                          </p>
-                          <p className="text-slate-500 text-xs">
-                            {Math.abs(b.amount) < 0.01 ? 'مسوّى' : b.amount > 0 ? 'يستحق' : 'مدين'}
-                            {hasDetail && <span className="mr-1 text-slate-600">· اضغط للتفاصيل</span>}
-                          </p>
-                        </div>
-                        <span className={`font-bold ${
-                          Math.abs(b.amount) < 0.01 ? 'text-slate-500' :
-                          b.amount > 0 ? 'text-emerald-400' : 'text-red-400'
-                        }`}>
-                          {Math.abs(b.amount) < 0.01 ? '0.00' : (b.amount > 0 ? '+' : '')}{b.amount.toFixed(2)} {symbol}
-                        </span>
-                      </button>
-                      {isSelected && hasDetail && (
-                        <div className="mx-2 bg-slate-900 border border-slate-700 border-t-0 rounded-b-xl px-4 py-3 space-y-2">
-                          {owes.map((t, i) => (
-                            <div key={i} className="flex items-center gap-2">
-                              <Avatar uid={t.to} name={t.toName} photoURL={t.toPhoto} size="xs" />
-                              <span className="text-slate-400 text-xs flex-1">
-                                يدفع لـ <span className="text-white font-medium">{t.to === user?.uid ? 'أنت' : getNickname(t.to, t.toName)}</span>
-                              </span>
-                              <span className="text-red-400 text-xs font-bold">{t.amount.toFixed(2)} {symbol}</span>
-                            </div>
-                          ))}
-                          {owedBy.map((t, i) => (
-                            <div key={i} className="flex items-center gap-2">
-                              <Avatar uid={t.from} name={t.fromName} photoURL={t.fromPhoto} size="xs" />
-                              <span className="text-slate-400 text-xs flex-1">
-                                <span className="text-white font-medium">{t.from === user?.uid ? 'أنت' : getNickname(t.from, t.fromName)}</span> يستلم من
-                              </span>
-                              <span className="text-emerald-400 text-xs font-bold">{t.amount.toFixed(2)} {symbol}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                    <button
+                      key={key}
+                      onClick={() => handleQuickSettle(t)}
+                      disabled={settlingKey === key}
+                      className="w-full card p-3 flex items-center gap-3 hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-colors text-right disabled:opacity-50"
+                    >
+                      <Avatar uid={t.to} name={t.toName} photoURL={t.toPhoto} size="sm" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white text-sm">
+                          ادفع لـ <span className="font-medium">{getNickname(t.to, t.toName)}</span>
+                        </p>
+                        <p className="text-red-400 font-bold text-base">{t.amount.toFixed(2)} {symbol}</p>
+                      </div>
+                      {settlingKey === key
+                        ? <LoadingSpinner size="sm" />
+                        : <CheckCircle className="text-emerald-400 flex-shrink-0" size={20} />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Credits owed to me */}
+            {myCredits.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-slate-400 text-xs font-medium">يدينون لك</h3>
+                {myCredits.map((t, i) => (
+                  <div key={i} className="card p-3 flex items-center gap-3">
+                    <Avatar uid={t.from} name={t.fromName} photoURL={t.fromPhoto} size="sm" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-sm">
+                        <span className="font-medium">{getNickname(t.from, t.fromName)}</span> يدين لك
+                      </p>
+                    </div>
+                    <span className="font-bold text-emerald-400 flex-shrink-0">{t.amount.toFixed(2)} {symbol}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Recent expenses preview */}
+            {recentExpenses.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-slate-400 text-xs font-medium">آخر المصاريف</h3>
+                  <button
+                    onClick={() => setTab('expenses')}
+                    className="text-emerald-400 hover:text-emerald-300 text-xs font-medium transition-colors"
+                  >
+                    عرض الكل ({expenses.length})
+                  </button>
+                </div>
+                {recentExpenses.map((e) => {
+                  const sym = getCurrency(e.currency || group.currency).symbol;
+                  const cat = getExpenseCategory(e.category);
+                  const CatIcon = cat.icon;
+                  return (
+                    <div key={e.id} className="card p-3 flex items-center gap-3">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${cat.bg}`}>
+                        <CatIcon size={16} className={cat.color} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white text-sm font-medium truncate">{e.title}</p>
+                        <p className="text-slate-500 text-xs truncate">
+                          {e.paidBy === user?.uid ? 'أنت دفعت' : `${getNickname(e.paidBy, e.paidByName)} دفع`}
+                        </p>
+                      </div>
+                      <span className="text-slate-300 text-sm font-bold flex-shrink-0">
+                        {e.amount.toFixed(2)} {sym}
+                      </span>
                     </div>
                   );
                 })}
-                {balancesPage.hasMore && (
-                  <div ref={balancesPage.sentinelRef} className="py-3 flex justify-center">
-                    <button
-                      onClick={balancesPage.loadMore}
-                      className="text-slate-400 hover:text-slate-200 text-xs font-medium px-4 py-2 rounded-lg border border-slate-700 hover:border-slate-600 transition-colors"
-                    >
-                      عرض المزيد ({balancesPage.remaining})
-                    </button>
-                  </div>
-                )}
-                {transfers.length > 0 && (
-                  <div className="mt-6">
-                    <h3 className="text-slate-400 text-sm font-medium mb-3">التحويلات المقترحة</h3>
-                    <div className="space-y-2">
-                      {balanceTransfersPage.visible.map((t, i) => (
-                        <div key={i} className="card p-4 flex items-center gap-3">
-                          <Avatar uid={t.from} name={t.fromName} photoURL={t.fromPhoto} size="sm" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-white text-sm">
-                              <span className="font-medium">{t.from === user?.uid ? 'أنت' : getNickname(t.from, t.fromName)}</span>
-                              <span className="text-slate-400 mx-1">→</span>
-                              <span className="font-medium">{t.to === user?.uid ? 'أنت' : getNickname(t.to, t.toName)}</span>
-                            </p>
-                          </div>
-                          <Avatar uid={t.to} name={t.toName} photoURL={t.toPhoto} size="sm" />
-                          <span className="font-bold text-emerald-400 mr-2">{t.amount.toFixed(2)} {symbol}</span>
-                        </div>
-                      ))}
-                    </div>
-                    {balanceTransfersPage.hasMore && (
-                      <div ref={balanceTransfersPage.sentinelRef} className="py-3 flex justify-center">
-                        <button
-                          onClick={balanceTransfersPage.loadMore}
-                          className="text-slate-400 hover:text-slate-200 text-xs font-medium px-4 py-2 rounded-lg border border-slate-700 hover:border-slate-600 transition-colors"
-                        >
-                          عرض المزيد ({balanceTransfersPage.remaining})
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </>
+              </div>
+            )}
+
+            {/* Empty state */}
+            {expenses.length === 0 && (!myBalance || Math.abs(myBalance.amount) < 0.01) && (
+              <EmptyState
+                icon={Receipt}
+                title="ابدأ بإضافة مصروف"
+                description="سجّل أول مصروف للمجموعة لرؤية الأرصدة والديون"
+                action={canAddExpense ? { label: 'إضافة مصروف', onClick: () => setShowAddExpense(true) } : undefined}
+              />
             )}
           </div>
         )}
 
-        {tab === 'settlements' && <SettlementsView transfers={transfers} />}
+        {tab === 'expenses' && <ExpenseList />}
 
-        {tab === 'activity' && <ActivityFeed />}
+        {tab === 'more' && (
+          <div className="space-y-4">
+            <div className="flex gap-1 bg-slate-900 border border-slate-800 p-1 rounded-xl">
+              {([
+                { key: 'activity', label: 'النشاط', icon: Activity },
+                { key: 'history', label: 'سجل التسويات', icon: History },
+                { key: 'stats', label: 'إحصائيات', icon: BarChart3 },
+              ] as const).map(({ key, label, icon: Icon }) => (
+                <button
+                  key={key}
+                  onClick={() => setMoreTab(key)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
+                    moreTab === key ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-300'
+                  }`}
+                >
+                  <Icon size={14} />
+                  {label}
+                </button>
+              ))}
+            </div>
 
-        {tab === 'stats' && <GroupStats />}
+            {moreTab === 'activity' && <ActivityFeed />}
+            {moreTab === 'stats' && <GroupStats />}
+            {moreTab === 'history' && <SettlementsView transfers={transfers} />}
+
+            {moreTab === 'history' && transfers.length === 0 && settlements.length === 0 && (
+              <EmptyState
+                icon={ArrowLeftRight}
+                title="لا توجد تسويات بعد"
+                description="ستظهر هنا التسويات المقترحة وسجل الدفعات السابقة"
+              />
+            )}
+          </div>
+        )}
       </div>
 
       {showAddExpense && (
