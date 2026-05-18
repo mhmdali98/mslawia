@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, ChevronDown } from 'lucide-react';
+import { X, ChevronDown, ChevronUp, Sliders } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useExpenses, ExpenseInput } from '../../hooks/useExpenses';
 
@@ -48,6 +48,15 @@ export function ExpenseFormModal({ onClose, expense, defaultCurrency = 'USD' }: 
   const [category, setCategory] = useState(expense?.category || 'other');
   const [note, setNote] = useState(expense?.note || '');
   const [loading, setLoading] = useState(false);
+  // Show advanced section automatically when editing or when any advanced field is non-default
+  const [showAdvanced, setShowAdvanced] = useState(
+    !!expense && (
+      expense.splitType !== 'equal' ||
+      expense.category !== 'other' ||
+      !!expense.note ||
+      expense.date !== new Date().toISOString().slice(0, 10)
+    )
+  );
 
   const currency = expense?.currency || defaultCurrency;
   const currencySymbol = getCurrency(currency).symbol;
@@ -166,41 +175,8 @@ export function ExpenseFormModal({ onClose, expense, defaultCurrency = 'USD' }: 
           </div>
 
           <div>
-            <label className="label">الفئة</label>
-            <div className="grid grid-cols-4 gap-2">
-              {EXPENSE_CATEGORIES.map(cat => {
-                const Icon = cat.icon;
-                const selected = category === cat.id;
-                return (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => setCategory(cat.id)}
-                    className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl border transition-colors ${
-                      selected
-                        ? `${cat.bg} border-current ${cat.color}`
-                        : 'bg-slate-800 border-slate-700 hover:border-slate-600'
-                    }`}
-                  >
-                    <Icon size={18} className={selected ? cat.color : 'text-slate-500'} />
-                    <span className={`text-xs leading-tight ${selected ? 'text-white font-medium' : 'text-slate-500'}`}>
-                      {cat.labelAr}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">المبلغ ({currencySymbol}) *</label>
-              <input className="input" type="number" placeholder="0.00" min="0" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} />
-            </div>
-            <div>
-              <label className="label">التاريخ</label>
-              <input className="input" type="date" value={date} onChange={e => setDate(e.target.value)} />
-            </div>
+            <label className="label">المبلغ ({currencySymbol}) *</label>
+            <input className="input" type="number" placeholder="0.00" min="0" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} />
           </div>
 
           <div>
@@ -208,35 +184,83 @@ export function ExpenseFormModal({ onClose, expense, defaultCurrency = 'USD' }: 
             <div className="relative">
               <select className="input appearance-none cursor-pointer" value={paidBy} onChange={e => setPaidBy(e.target.value)}>
                 {members.map(m => (
-                  <option key={m.uid} value={m.uid}>{m.displayName}</option>
+                  <option key={m.uid} value={m.uid}>{m.uid === user?.uid ? `أنا (${m.displayName})` : m.displayName}</option>
                 ))}
               </select>
               <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
             </div>
           </div>
 
-          <div>
-            <label className="label">طريقة التقسيم</label>
-            <div className="flex gap-2">
-              {([
-                { key: 'equal', label: 'متساوٍ' },
-                { key: 'percentage', label: 'نسب %' },
-                { key: 'custom', label: 'مخصص' },
-              ] as const).map(({ key, label }) => (
-                <button
-                  key={key}
-                  onClick={() => setSplitType(key)}
-                  className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-colors ${
-                    splitType === key
-                      ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
-                      : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
+          <button
+            type="button"
+            onClick={() => setShowAdvanced(s => !s)}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-800/50 border border-slate-700 text-slate-300 text-sm hover:border-slate-600 transition-colors"
+          >
+            <span className="flex items-center gap-2">
+              <Sliders size={14} />
+              خيارات متقدمة
+            </span>
+            {showAdvanced ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+
+          {showAdvanced && (
+            <div className="space-y-4 pt-1">
+              <div>
+                <label className="label">التاريخ</label>
+                <input className="input" type="date" value={date} onChange={e => setDate(e.target.value)} />
+              </div>
+
+              <div>
+                <label className="label">الفئة</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {EXPENSE_CATEGORIES.map(cat => {
+                    const Icon = cat.icon;
+                    const selected = category === cat.id;
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setCategory(cat.id)}
+                        className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl border transition-colors ${
+                          selected
+                            ? `${cat.bg} border-current ${cat.color}`
+                            : 'bg-slate-800 border-slate-700 hover:border-slate-600'
+                        }`}
+                      >
+                        <Icon size={18} className={selected ? cat.color : 'text-slate-500'} />
+                        <span className={`text-xs leading-tight ${selected ? 'text-white font-medium' : 'text-slate-500'}`}>
+                          {cat.labelAr}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="label">طريقة التقسيم</label>
+                <div className="flex gap-2">
+                  {([
+                    { key: 'equal', label: 'متساوٍ' },
+                    { key: 'percentage', label: 'نسب %' },
+                    { key: 'custom', label: 'مخصص' },
+                  ] as const).map(({ key, label }) => (
+                    <button
+                      key={key}
+                      onClick={() => setSplitType(key)}
+                      className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-colors ${
+                        splitType === key
+                          ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
+                          : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
-          </div>
+          )}
 
           <div>
             <label className="label">المشاركون</label>
@@ -317,10 +341,12 @@ export function ExpenseFormModal({ onClose, expense, defaultCurrency = 'USD' }: 
             )}
           </div>
 
-          <div>
-            <label className="label">ملاحظة (اختيارية)</label>
-            <input className="input" placeholder="أي تفاصيل إضافية..." value={note} onChange={e => setNote(e.target.value)} />
-          </div>
+          {showAdvanced && (
+            <div>
+              <label className="label">ملاحظة (اختيارية)</label>
+              <input className="input" placeholder="أي تفاصيل إضافية..." value={note} onChange={e => setNote(e.target.value)} />
+            </div>
+          )}
 
           <button
             onClick={handleSubmit}

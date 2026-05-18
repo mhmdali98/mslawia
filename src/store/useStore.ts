@@ -10,6 +10,7 @@ interface AppState {
   expenses: Expense[];
   settlements: Settlement[];
   activityLogs: ActivityLogEntry[];
+  groupBalanceCache: Record<string, { amount: number; currency: string; updatedAt: string }>;
   toasts: Toast[];
   isLoading: boolean;
   groupsLoaded: boolean;
@@ -22,6 +23,7 @@ interface AppState {
   setExpenses: (expenses: Expense[]) => void;
   setSettlements: (settlements: Settlement[]) => void;
   setActivityLogs: (logs: ActivityLogEntry[]) => void;
+  cacheGroupBalance: (groupId: string, amount: number, currency: string) => void;
   setGroupsLoaded: (loaded: boolean) => void;
   setExpensesLoaded: (loaded: boolean) => void;
   addToast: (message: string, type: Toast['type']) => void;
@@ -40,6 +42,7 @@ export const useStore = create<AppState>()(
       expenses: [],
       settlements: [],
       activityLogs: [],
+      groupBalanceCache: {},
       toasts: [],
       isLoading: false,
       groupsLoaded: false,
@@ -52,6 +55,12 @@ export const useStore = create<AppState>()(
       setExpenses: (expenses) => set({ expenses }),
       setSettlements: (settlements) => set({ settlements }),
       setActivityLogs: (activityLogs) => set({ activityLogs }),
+      cacheGroupBalance: (groupId, amount, currency) => set((state) => ({
+        groupBalanceCache: {
+          ...state.groupBalanceCache,
+          [groupId]: { amount, currency, updatedAt: new Date().toISOString() },
+        },
+      })),
       setGroupsLoaded: (groupsLoaded) => set({ groupsLoaded }),
       setExpensesLoaded: (expensesLoaded) => set({ expensesLoaded }),
       addToast: (message, type) => {
@@ -71,6 +80,7 @@ export const useStore = create<AppState>()(
         expenses: [],
         settlements: [],
         activityLogs: [],
+        groupBalanceCache: {},
         toasts: [],
         isLoading: false,
         groupsLoaded: false,
@@ -79,7 +89,11 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'mslawia-storage',
-      partialize: (state) => ({ user: state.user, currentGroupId: state.currentGroupId }),
+      partialize: (state) => ({
+        user: state.user,
+        currentGroupId: state.currentGroupId,
+        groupBalanceCache: state.groupBalanceCache,
+      }),
     }
   )
 );
