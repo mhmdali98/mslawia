@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowRight, Plus, Users, Receipt, ArrowLeftRight,
@@ -32,6 +32,18 @@ export function GroupPage() {
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showMenu]);
 
   const group = groups.find(g => g.id === groupId);
 
@@ -124,7 +136,7 @@ export function GroupPage() {
               <Plus size={16} />
               مصروف
             </button>
-            <div className="relative">
+            <div className="relative" ref={menuRef}>
               <button
                 onClick={() => setShowMenu(!showMenu)}
                 className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
@@ -132,7 +144,7 @@ export function GroupPage() {
                 <MoreVertical size={20} />
               </button>
               {showMenu && (
-                <div className="absolute left-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-xl min-w-[200px] z-40 overflow-hidden">
+                <div className="absolute left-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-xl min-w-[200px] z-50 overflow-hidden">
                   <button
                     onClick={() => { handleCopyInvite(); setShowMenu(false); }}
                     className="w-full flex items-center gap-2 px-4 py-3 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
@@ -287,7 +299,6 @@ export function GroupPage() {
           onClose={() => setShowSettings(false)}
         />
       )}
-      {showMenu && <div className="fixed inset-0 z-30" onClick={() => setShowMenu(false)} />}
     </div>
   );
 }

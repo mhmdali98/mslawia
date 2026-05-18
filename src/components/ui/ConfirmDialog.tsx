@@ -1,14 +1,28 @@
+import { useEffect } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { useConfirm } from '../../store/useConfirm';
 
 export function ConfirmDialog() {
   const { options, respond } = useConfirm();
+
+  useEffect(() => {
+    if (!options) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') respond(false);
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [options, respond]);
+
   if (!options) return null;
 
   const isDanger = options.variant === 'danger';
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center p-4">
+    <div
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) respond(false); }}
+    >
       <div className="card w-full max-w-sm p-6">
         <div className="flex items-start gap-3 mb-4">
           {isDanger && (
