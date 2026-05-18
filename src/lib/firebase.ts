@@ -3,12 +3,13 @@ import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: "AIzaSyD5UrPDGYxz5qFuQMPOrrLRGgVFTJcUBgI",
+  authDomain: "mslawia.firebaseapp.com",
+  projectId: "mslawia",
+  storageBucket: "mslawia.firebasestorage.app",
+  messagingSenderId: "474856869413",
+  appId: "1:474856869413:web:48242d2937eabee12339cc",
+  measurementId: "G-MTZW7G3JMG",
 };
 
 const app = initializeApp(firebaseConfig);
