@@ -17,13 +17,14 @@ export interface Group {
   id: string;
   name: string;
   description?: string;
+  category?: string;
   createdBy: string;
   createdAt: string;
   memberCount: number;
   currency: string;
 }
 
-export type SplitType = 'equal' | 'custom';
+export type SplitType = 'equal' | 'custom' | 'percentage';
 
 export interface ExpenseSplit {
   uid: string;
@@ -42,6 +43,7 @@ export interface Expense {
   splits: ExpenseSplit[];
   splitType: SplitType;
   date: string;
+  category?: string;
   note?: string;
   createdBy: string;
   createdAt: string;

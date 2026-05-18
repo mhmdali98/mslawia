@@ -4,6 +4,7 @@ import { useStore } from '../../store/useStore';
 import { useExpenses, ExpenseInput } from '../../hooks/useExpenses';
 import { splitEqually } from '../../lib/calculations';
 import { getCurrency } from '../../lib/currencies';
+import { EXPENSE_CATEGORIES } from '../../lib/categories';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { Avatar } from '../ui/Avatar';
 import { Expense, ExpenseSplit } from '../../types';
@@ -22,7 +23,9 @@ export function ExpenseFormModal({ onClose, expense, defaultCurrency = 'USD' }: 
   const [title, setTitle] = useState(expense?.title || '');
   const [amount, setAmount] = useState(expense?.amount.toString() || '');
   const [paidBy, setPaidBy] = useState(expense?.paidBy || user?.uid || '');
-  const [splitType, setSplitType] = useState<'equal' | 'custom'>(expense?.splitType || 'equal');
+  const [splitType, setSplitType] = useState<'equal' | 'custom'>(
+    (expense?.splitType === 'percentage' ? 'equal' : expense?.splitType) || 'equal'
+  );
   const [selectedMembers, setSelectedMembers] = useState<string[]>(
     expense?.splits.map(s => s.uid) || []
   );
@@ -30,13 +33,13 @@ export function ExpenseFormModal({ onClose, expense, defaultCurrency = 'USD' }: 
     expense?.splits.reduce((acc, s) => ({ ...acc, [s.uid]: s.amount.toString() }), {}) || {}
   );
   const [date, setDate] = useState(expense?.date || new Date().toISOString().slice(0, 10));
+  const [category, setCategory] = useState(expense?.category || 'other');
   const [note, setNote] = useState(expense?.note || '');
   const [loading, setLoading] = useState(false);
 
   const currency = expense?.currency || defaultCurrency;
   const currencySymbol = getCurrency(currency).symbol;
 
-  // initialize selected members when members load (new expense only)
   useEffect(() => {
     if (!isEdit && members.length > 0 && selectedMembers.length === 0) {
       setSelectedMembers(members.map(m => m.uid));
@@ -94,6 +97,7 @@ export function ExpenseFormModal({ onClose, expense, defaultCurrency = 'USD' }: 
       splits,
       splitType,
       date,
+      category,
       note: note.trim() || undefined,
     };
 
@@ -123,6 +127,33 @@ export function ExpenseFormModal({ onClose, expense, defaultCurrency = 'USD' }: 
           <div>
             <label className="label">اسم المصروف *</label>
             <input className="input" placeholder="مثال: عشاء، تاكسي، بقالة..." value={title} onChange={e => setTitle(e.target.value)} />
+          </div>
+
+          <div>
+            <label className="label">الفئة</label>
+            <div className="grid grid-cols-4 gap-2">
+              {EXPENSE_CATEGORIES.map(cat => {
+                const Icon = cat.icon;
+                const selected = category === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setCategory(cat.id)}
+                    className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl border transition-colors ${
+                      selected
+                        ? `${cat.bg} border-current ${cat.color}`
+                        : 'bg-slate-800 border-slate-700 hover:border-slate-600'
+                    }`}
+                  >
+                    <Icon size={18} className={selected ? cat.color : 'text-slate-500'} />
+                    <span className={`text-xs leading-tight ${selected ? 'text-white font-medium' : 'text-slate-500'}`}>
+                      {cat.labelAr}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

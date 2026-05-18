@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowRight, Plus, Users, Receipt, ArrowLeftRight,
-  Copy, Trash2, LogOut, Download, MoreVertical, Settings,
+  Copy, Trash2, LogOut, Download, MoreVertical, Settings, Activity,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useGroups } from '../../hooks/useGroups';
@@ -15,8 +15,10 @@ import { SettlementsView } from '../settlements/SettlementsView';
 import { EmptyState } from '../ui/EmptyState';
 import { Avatar } from '../ui/Avatar';
 import { GroupSettingsModal } from './GroupSettingsModal';
+import { ActivityFeed } from '../activity/ActivityFeed';
+import { getGroupCategory } from '../../lib/categories';
 
-type Tab = 'expenses' | 'balances' | 'settlements';
+type Tab = 'expenses' | 'balances' | 'settlements' | 'activity';
 
 export function GroupPage() {
   const { groupId } = useParams<{ groupId: string }>();
@@ -47,6 +49,8 @@ export function GroupPage() {
 
   const isOwner = group.createdBy === user?.uid;
   const symbol = getCurrency(group.currency).symbol;
+  const groupCat = getGroupCategory(group.category);
+  const GroupCatIcon = groupCat.icon;
   const settlementsData = settlements.map(s => ({ from: s.from, to: s.to, amount: s.amount }));
   const balances = calculateBalances(expenses, settlementsData, members);
   const transfers = calculateMinTransfers(balances);
@@ -89,8 +93,11 @@ export function GroupPage() {
             >
               <ArrowRight size={20} />
             </button>
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${groupCat.bg}`}>
+              <GroupCatIcon size={18} className={groupCat.color} />
+            </div>
             <div className="min-w-0">
-              <h1 className="text-xl font-bold text-white truncate">{group.name}</h1>
+              <h1 className="text-lg font-bold text-white truncate">{group.name}</h1>
               <p className="text-slate-500 text-xs">{members.length} أعضاء · {group.currency}</p>
             </div>
           </div>
@@ -179,6 +186,7 @@ export function GroupPage() {
             { key: 'expenses', label: 'المصاريف', icon: Receipt },
             { key: 'balances', label: 'الأرصدة', icon: Users },
             { key: 'settlements', label: 'التسويات', icon: ArrowLeftRight },
+            { key: 'activity', label: 'النشاط', icon: Activity },
           ] as const).map(({ key, label, icon: Icon }) => (
             <button
               key={key}
@@ -245,6 +253,8 @@ export function GroupPage() {
         )}
 
         {tab === 'settlements' && <SettlementsView transfers={transfers} />}
+
+        {tab === 'activity' && <ActivityFeed />}
       </div>
 
       {showAddExpense && (
