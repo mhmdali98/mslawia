@@ -3,6 +3,7 @@ import { X, ChevronDown, UserMinus, Crown } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useGroups } from '../../hooks/useGroups';
 import { CURRENCIES } from '../../lib/currencies';
+import { GROUP_CATEGORIES } from '../../lib/categories';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { Avatar } from '../ui/Avatar';
 import { Group } from '../../types';
@@ -18,6 +19,7 @@ export function GroupSettingsModal({ group, onClose }: Props) {
   const [name, setName] = useState(group.name);
   const [description, setDescription] = useState(group.description || '');
   const [currency, setCurrency] = useState(group.currency);
+  const [groupCategory, setGroupCategory] = useState(group.category || 'other');
   const [loading, setLoading] = useState(false);
   const { addToast } = useStore();
 
@@ -30,6 +32,7 @@ export function GroupSettingsModal({ group, onClose }: Props) {
       name: name.trim(),
       description: description.trim(),
       currency,
+      category: groupCategory,
     });
     setLoading(false);
     onClose();
@@ -87,6 +90,34 @@ export function GroupSettingsModal({ group, onClose }: Props) {
               <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
             </div>
             <p className="text-slate-500 text-xs mt-1">المصاريف الموجودة تحتفظ بعملتها الأصلية</p>
+          </div>
+
+          <div>
+            <label className="label">نوع المجموعة</label>
+            <div className="grid grid-cols-4 gap-2">
+              {GROUP_CATEGORIES.map(cat => {
+                const Icon = cat.icon;
+                const selected = groupCategory === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => isOwner && setGroupCategory(cat.id)}
+                    disabled={!isOwner}
+                    className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl border transition-colors ${
+                      selected
+                        ? `${cat.bg} border-current ${cat.color}`
+                        : 'bg-slate-800 border-slate-700 hover:border-slate-600'
+                    } ${!isOwner ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+                  >
+                    <Icon size={18} className={selected ? cat.color : 'text-slate-500'} />
+                    <span className={`text-xs leading-tight text-center ${selected ? 'text-white font-medium' : 'text-slate-500'}`}>
+                      {cat.labelAr}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {isOwner && (

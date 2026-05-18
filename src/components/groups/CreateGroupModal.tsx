@@ -3,6 +3,7 @@ import { X, ChevronDown } from 'lucide-react';
 import { useGroups } from '../../hooks/useGroups';
 import { useStore } from '../../store/useStore';
 import { CURRENCIES } from '../../lib/currencies';
+import { GROUP_CATEGORIES } from '../../lib/categories';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 
 interface Props { onClose: () => void; }
@@ -12,6 +13,7 @@ export function CreateGroupModal({ onClose }: Props) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [currency, setCurrency] = useState('USD');
+  const [groupCategory, setGroupCategory] = useState('other');
   const [inviteCode, setInviteCode] = useState('');
   const [loading, setLoading] = useState(false);
   const { createGroup, joinByInvite } = useGroups();
@@ -20,7 +22,7 @@ export function CreateGroupModal({ onClose }: Props) {
   const handleCreate = async () => {
     if (!name.trim()) { addToast('أدخل اسم المجموعة.', 'error'); return; }
     setLoading(true);
-    await createGroup(name.trim(), description.trim(), currency);
+    await createGroup(name.trim(), description.trim(), currency, groupCategory);
     setLoading(false);
     onClose();
   };
@@ -80,6 +82,32 @@ export function CreateGroupModal({ onClose }: Props) {
                 value={description}
                 onChange={e => setDescription(e.target.value)}
               />
+            </div>
+            <div>
+              <label className="label">نوع المجموعة</label>
+              <div className="grid grid-cols-4 gap-2">
+                {GROUP_CATEGORIES.map(cat => {
+                  const Icon = cat.icon;
+                  const selected = groupCategory === cat.id;
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setGroupCategory(cat.id)}
+                      className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl border transition-colors ${
+                        selected
+                          ? `${cat.bg} border-current ${cat.color}`
+                          : 'bg-slate-800 border-slate-700 hover:border-slate-600'
+                      }`}
+                    >
+                      <Icon size={18} className={selected ? cat.color : 'text-slate-500'} />
+                      <span className={`text-xs leading-tight text-center ${selected ? 'text-white font-medium' : 'text-slate-500'}`}>
+                        {cat.labelAr}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
             <div>
               <label className="label">العملة</label>

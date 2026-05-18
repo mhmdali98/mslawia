@@ -45,7 +45,7 @@ export function useGroups() {
     return unsub;
   }, [currentGroupId, setMembers]);
 
-  const createGroup = async (name: string, description: string, currency: string) => {
+  const createGroup = async (name: string, description: string, currency: string, category = 'other') => {
     const { user: u } = useStore.getState();
     if (!u) return;
     try {
@@ -56,6 +56,7 @@ export function useGroups() {
       batch.set(groupRef, {
         name: name.trim(),
         description: description.trim(),
+        category,
         createdBy: u.uid,
         createdAt: new Date().toISOString(),
         memberIds: [u.uid],
@@ -79,7 +80,7 @@ export function useGroups() {
     }
   };
 
-  const updateGroup = async (groupId: string, data: Partial<Pick<Group, 'name' | 'description' | 'currency'>>) => {
+  const updateGroup = async (groupId: string, data: Partial<Pick<Group, 'name' | 'description' | 'currency' | 'category'>>) => {
     try {
       await setDoc(doc(db, 'groups', groupId), data, { merge: true });
       addToast('تم تحديث المجموعة.', 'success');

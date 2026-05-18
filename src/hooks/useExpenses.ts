@@ -15,8 +15,9 @@ export interface ExpenseInput {
   paidByName: string;
   paidByPhoto: string;
   splits: ExpenseSplit[];
-  splitType: 'equal' | 'custom';
+  splitType: 'equal' | 'custom' | 'percentage';
   date: string;
+  category?: string;
   note?: string;
 }
 
