@@ -48,7 +48,7 @@ export function InstallPrompt() {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-white text-sm font-medium">تثبيت التطبيق</p>
-          <p className="text-slate-500 text-xs">ثبّت مصاريا على هاتفك للوصول السريع</p>
+          <p className="text-slate-500 text-xs">ثبّت مصلاوية على هاتفك للوصول السريع</p>
         </div>
         <button onClick={handleInstall} className="btn-primary text-xs py-2 px-3 flex-shrink-0">
           تثبيت

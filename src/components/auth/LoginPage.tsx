@@ -11,7 +11,7 @@ export function LoginPage() {
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-emerald-500/10 border border-emerald-500/20 mb-6">
             <span className="text-4xl">💸</span>
           </div>
-          <h1 className="text-4xl font-bold text-white mb-2">مصاريا</h1>
+          <h1 className="text-4xl font-bold text-white mb-2">مصلاوية</h1>
           <p className="text-slate-400">قسّم المصاريف مع أصدقائك بسهولة</p>
         </div>
 

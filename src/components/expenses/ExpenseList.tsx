@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Trash2, Receipt, Edit2, Search, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -34,14 +34,42 @@ export function ExpenseList() {
   const group = groups.find(g => g.id === currentGroupId);
   const defaultCurrency = group?.currency || 'USD';
 
-  const filtered = expenses
-    .filter(e =>
-      !search ||
-      e.title.toLowerCase().includes(search.toLowerCase()) ||
-      e.note?.toLowerCase().includes(search.toLowerCase()) ||
-      e.paidByName.toLowerCase().includes(search.toLowerCase())
-    )
-    .filter(e => !filterCategory || e.category === filterCategory);
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return expenses
+      .filter(e =>
+        !q ||
+        e.title.toLowerCase().includes(q) ||
+        e.note?.toLowerCase().includes(q) ||
+        e.paidByName.toLowerCase().includes(q)
+      )
+      .filter(e => !filterCategory || e.category === filterCategory)
+      .slice()
+      .sort((a, b) => {
+        if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+        return (a.createdAt || '') < (b.createdAt || '') ? 1 : -1;
+      });
+  }, [expenses, search, filterCategory]);
+
+  const PAGE_SIZE = 10;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [search, filterCategory, currentGroupId]);
+
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (visibleCount >= filtered.length) return;
+    const el = sentinelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        setVisibleCount(c => Math.min(c + PAGE_SIZE, filtered.length));
+      }
+    }, { rootMargin: '200px' });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [visibleCount, filtered.length]);
+
+  const visible = filtered.slice(0, visibleCount);
 
   const canEdit = (e: Expense) => e.paidBy === user?.uid || e.createdBy === user?.uid;
 
@@ -127,17 +155,29 @@ export function ExpenseList() {
           <EmptyState icon={Search} title="لا نتائج" description="جرّب تغيير كلمة البحث أو الفئة" />
         )
       ) : (
-        <ExpenseListItems
-          filtered={filtered}
-          expanded={expanded}
-          toggleExpand={toggleExpand}
-          canEdit={canEdit}
-          setEditing={setEditing}
-          handleDelete={handleDelete}
-          user={user}
-          members={members}
-          defaultCurrency={defaultCurrency}
-        />
+        <>
+          <ExpenseListItems
+            filtered={visible}
+            expanded={expanded}
+            toggleExpand={toggleExpand}
+            canEdit={canEdit}
+            setEditing={setEditing}
+            handleDelete={handleDelete}
+            user={user}
+            members={members}
+            defaultCurrency={defaultCurrency}
+          />
+          {visibleCount < filtered.length && (
+            <div ref={sentinelRef} className="py-4 flex flex-col items-center gap-2">
+              <button
+                onClick={() => setVisibleCount(c => Math.min(c + PAGE_SIZE, filtered.length))}
+                className="text-slate-400 hover:text-slate-200 text-xs font-medium px-4 py-2 rounded-lg border border-slate-700 hover:border-slate-600 transition-colors"
+              >
+                عرض المزيد ({filtered.length - visibleCount})
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       {editing && (

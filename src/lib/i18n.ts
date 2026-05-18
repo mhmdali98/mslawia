@@ -24,7 +24,7 @@ export const useLocale = create<LocaleState>()(
 
 const TRANSLATIONS = {
   // Brand / global
-  appName: { ar: 'مصاريا', en: 'Mslawia' },
+  appName: { ar: 'مصلاوية', en: 'Mslawia' },
 
   // Auth
   loginWithGoogle: { ar: 'تسجيل الدخول بـ Google', en: 'Sign in with Google' },
@@ -72,7 +72,7 @@ const TRANSLATIONS = {
 
   // PWA
   installApp: { ar: 'تثبيت التطبيق', en: 'Install app' },
-  installDesc: { ar: 'ثبّت مصاريا على هاتفك للوصول السريع', en: 'Install Mslawia on your phone for quick access' },
+  installDesc: { ar: 'ثبّت مصلاوية على هاتفك للوصول السريع', en: 'Install Mslawia on your phone for quick access' },
   install: { ar: 'تثبيت', en: 'Install' },
   later: { ar: 'لاحقاً', en: 'Later' },
 
