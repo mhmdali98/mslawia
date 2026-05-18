@@ -7,7 +7,7 @@ import {
 import { useStore } from '../../store/useStore';
 import { useGroups } from '../../hooks/useGroups';
 import { useExpenses } from '../../hooks/useExpenses';
-import { calculateBalances, calculateMinTransfers } from '../../lib/calculations';
+import { calculateBalances, calculateMinTransfers, calculateDirectDebts } from '../../lib/calculations';
 import { getCurrency } from '../../lib/currencies';
 import { ExpenseList } from '../expenses/ExpenseList';
 import { ExpenseFormModal } from '../expenses/ExpenseFormModal';
@@ -70,7 +70,10 @@ export function GroupPage() {
   const GroupCatIcon = groupCat.icon;
   const settlementsData = settlements.map(s => ({ from: s.from, to: s.to, amount: s.amount }));
   const balances = calculateBalances(expenses, settlementsData, members);
-  const transfers = calculateMinTransfers(balances);
+  const simplify = group.simplifyDebts !== false;
+  const transfers = simplify
+    ? calculateMinTransfers(balances)
+    : calculateDirectDebts(expenses, settlementsData, members);
   const getNickname = useNickname(group.id);
 
   const handleCopyInvite = async () => {
@@ -246,6 +249,19 @@ export function GroupPage() {
               <EmptyState icon={Users} title="جميع الأرصدة مسوّاة" description="لا يوجد ديون حالياً في المجموعة" />
             ) : (
               <>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-slate-500">
+                    {simplify ? 'تبسيط الديون: مفعّل' : 'تبسيط الديون: معطّل'}
+                  </span>
+                  {isOwner && (
+                    <button
+                      onClick={() => setShowSettings(true)}
+                      className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
+                    >
+                      تغيير
+                    </button>
+                  )}
+                </div>
                 {new Set(expenses.map(e => e.currency || group.currency)).size > 1 && (
                   <div className="mb-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs">
                     تحتوي المجموعة على مصاريف بعملات مختلفة — الأرصدة المعروضة تجمع كل العملات بدون تحويل

@@ -29,6 +29,7 @@ export interface Group {
   currency: string;
   permissions?: GroupPermissions;
   nicknames?: Record<string, string>;
+  simplifyDebts?: boolean;
 }
 
 export type SplitType = 'equal' | 'custom' | 'percentage';
