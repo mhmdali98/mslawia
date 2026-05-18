@@ -50,8 +50,8 @@ export function notify(title: string, body: string, tag?: string, url?: string) 
         reg.showNotification(title, {
           body,
           tag,
-          icon: `${import.meta.env.BASE_URL}icon-192.svg`,
-          badge: `${import.meta.env.BASE_URL}icon-192.svg`,
+          icon: `${import.meta.env.BASE_URL}icon-192.png`,
+          badge: `${import.meta.env.BASE_URL}icon-192.png`,
           dir: 'rtl',
           lang: 'ar',
           data: { url: url || import.meta.env.BASE_URL },
@@ -63,7 +63,7 @@ export function notify(title: string, body: string, tag?: string, url?: string) 
   try {
     new Notification(title, {
       body,
-      icon: `${import.meta.env.BASE_URL}icon-192.svg`,
+      icon: `${import.meta.env.BASE_URL}icon-192.png`,
       tag,
     });
   } catch {

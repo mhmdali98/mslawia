@@ -1,12 +1,13 @@
 import { useEffect, useRef } from 'react';
 import {
   collection, onSnapshot, deleteDoc, doc,
-  setDoc, getDoc, query, where, writeBatch,
+  setDoc, getDoc, query, where, writeBatch, increment,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useStore } from '../store/useStore';
 import { notify } from '../store/useNotifications';
 import { Group, GroupMember } from '../types';
+import { logError } from '../lib/logger';
 
 export function useGroups() {
   const { user, setGroups, setMembers, currentGroupId, addToast } = useStore();
@@ -36,7 +37,7 @@ export function useGroups() {
           notify('مجموعة جديدة', `تمت إضافتك إلى ${g.name}`, `grp-${change.doc.id}`);
         }
       },
-      (error) => { console.error('Groups listener error:', error.code, error.message); }
+      (error) => { logError('useGroups', `Groups listener error: ${error.code} ${error.message}`); }
     );
 
     return unsub;
@@ -52,7 +53,7 @@ export function useGroups() {
         const members: GroupMember[] = snap.docs.map(d => ({ uid: d.id, ...d.data() } as GroupMember));
         setMembers(members);
       },
-      (error) => { console.error('Members listener error:', error.code, error.message); }
+      (error) => { logError('useGroups', `Members listener error: ${error.code} ${error.message}`); }
     );
     return unsub;
   }, [currentGroupId, setMembers]);
@@ -87,18 +88,18 @@ export function useGroups() {
       return groupRef.id;
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
-      console.error('createGroup error:', msg);
+      logError('useGroups', `createGroup error: ${msg}`);
       addToast('فشل إنشاء المجموعة.', 'error');
     }
   };
 
-  const updateGroup = async (groupId: string, data: Partial<Pick<Group, 'name' | 'description' | 'currency' | 'category' | 'permissions'>>) => {
+  const updateGroup = async (groupId: string, data: Partial<Pick<Group, 'name' | 'description' | 'currency' | 'category' | 'permissions' | 'nicknames'>>) => {
     try {
       await setDoc(doc(db, 'groups', groupId), data, { merge: true });
       addToast('تم تحديث المجموعة.', 'success');
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
-      console.error('updateGroup error:', msg);
+      logError('useGroups', `updateGroup error: ${msg}`);
       addToast('فشل تحديث المجموعة.', 'error');
     }
   };
@@ -109,7 +110,7 @@ export function useGroups() {
       addToast('تم حذف المجموعة.', 'success');
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
-      console.error('deleteGroup error:', msg);
+      logError('useGroups', `deleteGroup error: ${msg}`);
       addToast('فشل حذف المجموعة.', 'error');
     }
   };
@@ -148,7 +149,7 @@ export function useGroups() {
       addToast('غادرت المجموعة.', 'success');
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
-      console.error('leaveGroup error:', msg);
+      logError('useGroups', `leaveGroup error: ${msg}`);
       addToast('فشل مغادرة المجموعة.', 'error');
     }
   };
@@ -156,11 +157,28 @@ export function useGroups() {
   // owner-only: remove another member
   const removeMember = async (groupId: string, memberUid: string) => {
     try {
+      // Fix 2: Check if member has active expenses
+      const { expenses } = useStore.getState();
+      const hasExpenses = expenses.some(
+        e => e.paidBy === memberUid || e.splits.some(s => s.uid === memberUid)
+      );
+      if (hasExpenses) {
+        addToast('لا يمكن إزالة عضو لديه مصاريف نشطة في المجموعة. قم بحذف أو تعديل مصاريفه أولاً.', 'error');
+        return;
+      }
+
       const groupRef = doc(db, 'groups', groupId);
       const snap = await getDoc(groupRef);
       if (!snap.exists()) return;
       const data = snap.data() as Group & { memberIds: string[] };
       const remaining = data.memberIds.filter(id => id !== memberUid);
+
+      // Fix 7: Last member guard
+      if (remaining.length === 0) {
+        await deleteDoc(groupRef);
+        addToast('تم حذف العضو الأخير وتم حذف المجموعة.', 'success');
+        return;
+      }
 
       const batch = writeBatch(db);
       batch.delete(doc(db, 'groups', groupId, 'members', memberUid));
@@ -169,7 +187,7 @@ export function useGroups() {
       addToast('تم إزالة العضو.', 'success');
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
-      console.error('removeMember error:', msg);
+      logError('useGroups', `removeMember error: ${msg}`);
       addToast('فشل إزالة العضو.', 'error');
     }
   };
@@ -186,11 +204,13 @@ export function useGroups() {
         createdBy: u.uid,
         createdAt: new Date().toISOString(),
         expiresAt,
+        maxUses: 20,
+        usedCount: 0,
       });
       return code;
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
-      console.error('createInvite error:', msg);
+      logError('useGroups', `createInvite error: ${msg}`);
       addToast('فشل إنشاء رابط الدعوة.', 'error');
       return null;
     }
@@ -205,6 +225,12 @@ export function useGroups() {
       const invite = inviteSnap.data();
       if (new Date(invite.expiresAt) < new Date()) {
         addToast('انتهت صلاحية رابط الدعوة.', 'error');
+        return false;
+      }
+
+      // Fix 8: Check usage count
+      if (invite.maxUses !== undefined && invite.usedCount >= invite.maxUses) {
+        addToast('رابط الدعوة وصل للحد الأقصى من الاستخدامات.', 'error');
         return false;
       }
 
@@ -231,12 +257,14 @@ export function useGroups() {
         memberIds: [...memberIds, u.uid],
         memberCount: memberIds.length + 1,
       });
+      // Fix 8: Increment usedCount atomically
+      batch.update(doc(db, 'invites', code), { usedCount: increment(1) });
       await batch.commit();
       addToast(`انضممت إلى ${invite.groupName}!`, 'success');
       return true;
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
-      console.error('joinByInvite error:', msg);
+      logError('useGroups', `joinByInvite error: ${msg}`);
       addToast('فشل الانضمام للمجموعة.', 'error');
       return false;
     }

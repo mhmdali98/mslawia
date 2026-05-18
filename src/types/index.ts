@@ -28,6 +28,7 @@ export interface Group {
   memberCount: number;
   currency: string;
   permissions?: GroupPermissions;
+  nicknames?: Record<string, string>;
 }
 
 export type SplitType = 'equal' | 'custom' | 'percentage';
@@ -54,6 +55,8 @@ export interface Expense {
   createdBy: string;
   createdAt: string;
   updatedAt?: string;
+  updatedBy?: string;
+  updatedByName?: string;
 }
 
 export interface Settlement {
