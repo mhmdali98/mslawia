@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowRight, Plus, Receipt, Home, MoreHorizontal,
   Copy, Trash2, LogOut, Download, MoreVertical, Settings, Activity, BarChart3, History,
-  CheckCircle, ArrowLeftRight,
+  CheckCircle, ArrowLeftRight, Scale,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useGroups } from '../../hooks/useGroups';
@@ -20,12 +20,13 @@ import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { GroupSettingsModal } from './GroupSettingsModal';
 import { ActivityFeed } from '../activity/ActivityFeed';
 import { GroupStats } from './GroupStats';
+import { BalancesView } from './BalancesView';
 import { getGroupCategory } from '../../lib/categories';
 import { confirmAction } from '../../store/useConfirm';
 import { useNickname } from '../../hooks/useNickname';
 import { Expense } from '../../types';
 
-type Tab = 'home' | 'expenses' | 'more';
+type Tab = 'home' | 'expenses' | 'balances' | 'more';
 type MoreSubTab = 'activity' | 'stats' | 'history';
 
 export function GroupPage() {
@@ -262,6 +263,7 @@ export function GroupPage() {
           {([
             { key: 'home', label: 'الرئيسية', icon: Home },
             { key: 'expenses', label: 'المصاريف', icon: Receipt },
+            { key: 'balances', label: 'الأرصدة', icon: Scale },
             { key: 'more', label: 'المزيد', icon: MoreHorizontal },
           ] as const).map(({ key, label, icon: Icon }) => (
             <button
@@ -352,34 +354,6 @@ export function GroupPage() {
               </div>
             )}
 
-            {/* All members balances */}
-            {balances.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="text-slate-400 text-xs font-medium">أرصدة الأعضاء</h3>
-                <div className="card divide-y divide-slate-800">
-                  {balances.map((b) => {
-                    const isSettled = Math.abs(b.amount) < 0.01;
-                    const isPositive = b.amount > 0.01;
-                    return (
-                      <div key={b.uid} className="flex items-center gap-3 p-3">
-                        <Avatar uid={b.uid} name={b.displayName} photoURL={b.photoURL} size="sm" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-white text-sm font-medium truncate">
-                            {b.uid === user?.uid ? 'أنت' : getNickname(b.uid, b.displayName)}
-                          </p>
-                          <p className={`text-xs mt-0.5 ${isSettled ? 'text-slate-500' : isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
-                            {isSettled ? 'مسوّى' : isPositive ? 'دائن' : 'مدين'}
-                          </p>
-                        </div>
-                        <span className={`font-bold text-sm flex-shrink-0 ${isSettled ? 'text-slate-500' : isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
-                          {isSettled ? '—' : `${isPositive ? '+' : ''}${b.amount.toFixed(2)} ${symbol}`}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
 
             {/* Recent expenses preview */}
             {recentExpenses.length > 0 && (
@@ -422,6 +396,20 @@ export function GroupPage() {
         )}
 
         {tab === 'expenses' && <ExpenseList />}
+
+        {tab === 'balances' && (
+          <BalancesView
+            balances={balances}
+            transfers={transfers}
+            symbol={symbol}
+            myUid={user?.uid}
+            canSettle={canSettle}
+            simplifyDebts={simplify}
+            getNickname={getNickname}
+            settlingKey={settlingKey}
+            onSettle={handleQuickSettle}
+          />
+        )}
 
         {tab === 'more' && (
           <div className="space-y-4">
