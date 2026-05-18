@@ -108,6 +108,7 @@ export function GroupPage() {
 
   const myBalance = balances.find(b => b.uid === user?.uid);
   const myTransfers = transfers.filter(t => t.from === user?.uid || t.to === user?.uid);
+  const [selectedBalance, setSelectedBalance] = useState<string | null>(null);
 
   return (
     <div className="min-h-screen bg-slate-950">
@@ -236,25 +237,59 @@ export function GroupPage() {
             {balances.length === 0 || balances.every(b => Math.abs(b.amount) < 0.01) ? (
               <EmptyState icon={Users} title="جميع الأرصدة مسوّاة" description="لا يوجد ديون حالياً في المجموعة" />
             ) : (
-              balances.map(b => (
-                <div key={b.uid} className="card p-4 flex items-center gap-3">
-                  <Avatar uid={b.uid} name={b.displayName} photoURL={b.photoURL} size="md" />
-                  <div className="flex-1">
-                    <p className="text-white font-medium text-sm">
-                      {b.uid === user?.uid ? 'أنت' : b.displayName}
-                    </p>
-                    <p className="text-slate-500 text-xs">
-                      {Math.abs(b.amount) < 0.01 ? 'مسوّى' : b.amount > 0 ? 'يستحق' : 'مدين'}
-                    </p>
+              balances.map(b => {
+                const isSelected = selectedBalance === b.uid;
+                const owes = transfers.filter(t => t.from === b.uid);
+                const owedBy = transfers.filter(t => t.to === b.uid);
+                const hasDetail = owes.length > 0 || owedBy.length > 0;
+                return (
+                  <div key={b.uid}>
+                    <button
+                      onClick={() => setSelectedBalance(isSelected ? null : b.uid)}
+                      className={`card p-4 flex items-center gap-3 w-full text-right transition-colors ${hasDetail ? 'hover:bg-slate-800/60 cursor-pointer' : 'cursor-default'} ${isSelected ? 'ring-1 ring-slate-600' : ''}`}
+                    >
+                      <Avatar uid={b.uid} name={b.displayName} photoURL={b.photoURL} size="md" />
+                      <div className="flex-1">
+                        <p className="text-white font-medium text-sm">
+                          {b.uid === user?.uid ? 'أنت' : b.displayName}
+                        </p>
+                        <p className="text-slate-500 text-xs">
+                          {Math.abs(b.amount) < 0.01 ? 'مسوّى' : b.amount > 0 ? 'يستحق' : 'مدين'}
+                          {hasDetail && <span className="mr-1 text-slate-600">· اضغط للتفاصيل</span>}
+                        </p>
+                      </div>
+                      <span className={`font-bold ${
+                        Math.abs(b.amount) < 0.01 ? 'text-slate-500' :
+                        b.amount > 0 ? 'text-emerald-400' : 'text-red-400'
+                      }`}>
+                        {Math.abs(b.amount) < 0.01 ? '0.00' : (b.amount > 0 ? '+' : '')}{b.amount.toFixed(2)} {symbol}
+                      </span>
+                    </button>
+                    {isSelected && hasDetail && (
+                      <div className="mx-2 bg-slate-900 border border-slate-700 border-t-0 rounded-b-xl px-4 py-3 space-y-2">
+                        {owes.map((t, i) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <Avatar uid={t.to} name={t.toName} photoURL={t.toPhoto} size="xs" />
+                            <span className="text-slate-400 text-xs flex-1">
+                              مدين لـ <span className="text-white font-medium">{t.to === user?.uid ? 'أنت' : t.toName}</span>
+                            </span>
+                            <span className="text-red-400 text-xs font-bold">{t.amount.toFixed(2)} {symbol}</span>
+                          </div>
+                        ))}
+                        {owedBy.map((t, i) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <Avatar uid={t.from} name={t.fromName} photoURL={t.fromPhoto} size="xs" />
+                            <span className="text-slate-400 text-xs flex-1">
+                              <span className="text-white font-medium">{t.from === user?.uid ? 'أنت' : t.fromName}</span> مدين له
+                            </span>
+                            <span className="text-emerald-400 text-xs font-bold">{t.amount.toFixed(2)} {symbol}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <span className={`font-bold ${
-                    Math.abs(b.amount) < 0.01 ? 'text-slate-500' :
-                    b.amount > 0 ? 'text-emerald-400' : 'text-red-400'
-                  }`}>
-                    {Math.abs(b.amount) < 0.01 ? '0.00' : (b.amount > 0 ? '+' : '')}{b.amount.toFixed(2)} {symbol}
-                  </span>
-                </div>
-              ))
+                );
+              })
             )}
             {transfers.length > 0 && (
               <div className="mt-6">
