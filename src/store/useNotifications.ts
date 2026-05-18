@@ -32,12 +32,34 @@ export const useNotifications = create<NotificationsState>()(
   )
 );
 
-export function notify(title: string, body: string, tag?: string) {
+export function notify(title: string, body: string, tag?: string, url?: string) {
   if (!('Notification' in window)) return;
   if (Notification.permission !== 'granted') return;
   if (!useNotifications.getState().enabled) return;
   // Skip when user is actively viewing the tab — toast is enough
   if (document.visibilityState === 'visible') return;
+
+  // Prefer the service worker — system-tray notification, works on mobile PWA
+  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({ type: 'notify', title, body, tag, url });
+    return;
+  }
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.ready
+      .then((reg) => {
+        reg.showNotification(title, {
+          body,
+          tag,
+          icon: `${import.meta.env.BASE_URL}icon-192.svg`,
+          badge: `${import.meta.env.BASE_URL}icon-192.svg`,
+          dir: 'rtl',
+          lang: 'ar',
+          data: { url: url || import.meta.env.BASE_URL },
+        });
+      })
+      .catch(() => {});
+    return;
+  }
   try {
     new Notification(title, {
       body,

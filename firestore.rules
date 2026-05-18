@@ -44,19 +44,41 @@ service cloud.firestore {
         );
       }
 
+      function membersCanAddExpenses(groupId) {
+        let g = get(/databases/$(database)/documents/groups/$(groupId)).data;
+        return !('permissions' in g) || g.permissions.membersCanAddExpenses != false;
+      }
+
+      function membersCanSettle(groupId) {
+        let g = get(/databases/$(database)/documents/groups/$(groupId)).data;
+        return !('permissions' in g) || g.permissions.membersCanSettle != false;
+      }
+
       match /expenses/{expenseId} {
-        allow read, create: if isMemberOf(groupId);
-        // payer or original creator can edit/delete their expense
+        allow read: if isMemberOf(groupId);
+        // owner can always add; members only if permission allows
+        allow create: if isMemberOf(groupId) && (
+          isGroupOwner(groupId) || membersCanAddExpenses(groupId)
+        );
+        // owner can edit/delete any; payer or creator can edit/delete their own
         allow update, delete: if isAuth() && (
+          isGroupOwner(groupId) ||
           resource.data.paidBy == request.auth.uid ||
           resource.data.createdBy == request.auth.uid
         );
       }
 
       match /settlements/{settlementId} {
-        allow read, create: if isMemberOf(groupId);
-        // only creator can edit/delete a settlement
-        allow update, delete: if isAuth() && resource.data.createdBy == request.auth.uid;
+        allow read: if isMemberOf(groupId);
+        // owner can always settle; members only if permission allows
+        allow create: if isMemberOf(groupId) && (
+          isGroupOwner(groupId) || membersCanSettle(groupId)
+        );
+        // owner can delete any; creator can delete their own
+        allow update, delete: if isAuth() && (
+          isGroupOwner(groupId) ||
+          resource.data.createdBy == request.auth.uid
+        );
       }
     }
 

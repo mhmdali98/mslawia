@@ -33,6 +33,7 @@ export function ExpenseList() {
 
   const group = groups.find(g => g.id === currentGroupId);
   const defaultCurrency = group?.currency || 'USD';
+  const isOwner = group?.createdBy === user?.uid;
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -71,7 +72,7 @@ export function ExpenseList() {
 
   const visible = filtered.slice(0, visibleCount);
 
-  const canEdit = (e: Expense) => e.paidBy === user?.uid || e.createdBy === user?.uid;
+  const canEdit = (e: Expense) => isOwner || e.paidBy === user?.uid || e.createdBy === user?.uid;
 
   const handleDelete = async (e: Expense) => {
     const ok = await confirmAction({

@@ -19,13 +19,14 @@ import { ActivityFeed } from '../activity/ActivityFeed';
 import { GroupStats } from './GroupStats';
 import { getGroupCategory } from '../../lib/categories';
 import { confirmAction } from '../../store/useConfirm';
+import { usePagination } from '../../hooks/usePagination';
 
 type Tab = 'expenses' | 'balances' | 'settlements' | 'activity' | 'stats';
 
 export function GroupPage() {
   const { groupId } = useParams<{ groupId: string }>();
   const navigate = useNavigate();
-  const { user, groups, members, expenses, settlements, setCurrentGroupId, addToast } = useStore();
+  const { user, groups, members, expenses, settlements, currentGroupId, setCurrentGroupId, addToast } = useStore();
   const { createInvite, deleteGroup, leaveGroup } = useGroups();
   const { exportBackup } = useExpenses();
   const [tab, setTab] = useState<Tab>('expenses');
@@ -62,6 +63,7 @@ export function GroupPage() {
   );
 
   const isOwner = group.createdBy === user?.uid;
+  const canAddExpense = isOwner || group.permissions?.membersCanAddExpenses !== false;
   const symbol = getCurrency(group.currency).symbol;
   const groupCat = getGroupCategory(group.category);
   const GroupCatIcon = groupCat.icon;
@@ -109,6 +111,8 @@ export function GroupPage() {
   const myBalance = balances.find(b => b.uid === user?.uid);
   const myTransfers = transfers.filter(t => t.from === user?.uid || t.to === user?.uid);
   const [selectedBalance, setSelectedBalance] = useState<string | null>(null);
+  const balancesPage = usePagination(balances, 10, currentGroupId);
+  const balanceTransfersPage = usePagination(transfers, 10, currentGroupId);
 
   return (
     <div className="min-h-screen bg-slate-950">
@@ -130,13 +134,15 @@ export function GroupPage() {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              onClick={() => setShowAddExpense(true)}
-              className="btn-primary flex items-center gap-1.5 text-sm"
-            >
-              <Plus size={16} />
-              مصروف
-            </button>
+            {canAddExpense && (
+              <button
+                onClick={() => setShowAddExpense(true)}
+                className="btn-primary flex items-center gap-1.5 text-sm"
+              >
+                <Plus size={16} />
+                مصروف
+              </button>
+            )}
             <div className="relative" ref={menuRef}>
               <button
                 onClick={() => setShowMenu(!showMenu)}
@@ -237,7 +243,7 @@ export function GroupPage() {
             {balances.length === 0 || balances.every(b => Math.abs(b.amount) < 0.01) ? (
               <EmptyState icon={Users} title="جميع الأرصدة مسوّاة" description="لا يوجد ديون حالياً في المجموعة" />
             ) : (
-              balances.map(b => {
+              balancesPage.visible.map(b => {
                 const isSelected = selectedBalance === b.uid;
                 const owes = transfers.filter(t => t.from === b.uid);
                 const owedBy = transfers.filter(t => t.to === b.uid);
@@ -291,11 +297,21 @@ export function GroupPage() {
                 );
               })
             )}
+            {balancesPage.hasMore && (
+              <div ref={balancesPage.sentinelRef} className="py-3 flex justify-center">
+                <button
+                  onClick={balancesPage.loadMore}
+                  className="text-slate-400 hover:text-slate-200 text-xs font-medium px-4 py-2 rounded-lg border border-slate-700 hover:border-slate-600 transition-colors"
+                >
+                  عرض المزيد ({balancesPage.remaining})
+                </button>
+              </div>
+            )}
             {transfers.length > 0 && (
               <div className="mt-6">
                 <h3 className="text-slate-400 text-sm font-medium mb-3">التحويلات المقترحة</h3>
                 <div className="space-y-2">
-                  {transfers.map((t, i) => (
+                  {balanceTransfersPage.visible.map((t, i) => (
                     <div key={i} className="card p-4 flex items-center gap-3">
                       <Avatar uid={t.from} name={t.fromName} photoURL={t.fromPhoto} size="sm" />
                       <div className="flex-1 min-w-0">
@@ -310,6 +326,16 @@ export function GroupPage() {
                     </div>
                   ))}
                 </div>
+                {balanceTransfersPage.hasMore && (
+                  <div ref={balanceTransfersPage.sentinelRef} className="py-3 flex justify-center">
+                    <button
+                      onClick={balanceTransfersPage.loadMore}
+                      className="text-slate-400 hover:text-slate-200 text-xs font-medium px-4 py-2 rounded-lg border border-slate-700 hover:border-slate-600 transition-colors"
+                    >
+                      عرض المزيد ({balanceTransfersPage.remaining})
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, ChevronDown, UserMinus, Crown } from 'lucide-react';
+import { X, ChevronDown, UserMinus, Crown, Shield } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useGroups } from '../../hooks/useGroups';
 import { confirmAction } from '../../store/useConfirm';
@@ -21,6 +21,12 @@ export function GroupSettingsModal({ group, onClose }: Props) {
   const [description, setDescription] = useState(group.description || '');
   const [currency, setCurrency] = useState(group.currency);
   const [groupCategory, setGroupCategory] = useState(group.category || 'other');
+  const [membersCanAddExpenses, setMembersCanAddExpenses] = useState(
+    group.permissions?.membersCanAddExpenses !== false
+  );
+  const [membersCanSettle, setMembersCanSettle] = useState(
+    group.permissions?.membersCanSettle !== false
+  );
   const [loading, setLoading] = useState(false);
   const { addToast } = useStore();
 
@@ -34,6 +40,7 @@ export function GroupSettingsModal({ group, onClose }: Props) {
       description: description.trim(),
       currency,
       category: groupCategory,
+      permissions: { membersCanAddExpenses, membersCanSettle },
     });
     setLoading(false);
     onClose();
@@ -126,6 +133,34 @@ export function GroupSettingsModal({ group, onClose }: Props) {
               })}
             </div>
           </div>
+
+          {isOwner && (
+            <div className="pt-2 border-t border-slate-800 space-y-3">
+              <div className="flex items-center gap-2 text-slate-300 text-sm font-medium">
+                <Shield size={14} className="text-amber-400" />
+                صلاحيات الأعضاء
+              </div>
+              <label className="flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-800 cursor-pointer">
+                <span className="text-slate-300 text-sm">يمكن للأعضاء إضافة مصاريف</span>
+                <input
+                  type="checkbox"
+                  checked={membersCanAddExpenses}
+                  onChange={e => setMembersCanAddExpenses(e.target.checked)}
+                  className="w-4 h-4 accent-emerald-500"
+                />
+              </label>
+              <label className="flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-800 cursor-pointer">
+                <span className="text-slate-300 text-sm">يمكن للأعضاء تسجيل تسويات</span>
+                <input
+                  type="checkbox"
+                  checked={membersCanSettle}
+                  onChange={e => setMembersCanSettle(e.target.checked)}
+                  className="w-4 h-4 accent-emerald-500"
+                />
+              </label>
+              <p className="text-slate-500 text-xs">المنشئ دائماً يمكنه القيام بكل العمليات.</p>
+            </div>
+          )}
 
           {isOwner && (
             <button
