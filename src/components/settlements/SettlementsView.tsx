@@ -1,25 +1,30 @@
 import { useState } from 'react';
-import { ArrowLeftRight, CheckCircle, Plus, X, ChevronDown } from 'lucide-react';
+import { ArrowLeftRight, CheckCircle, Plus, X, ChevronDown, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useStore } from '../../store/useStore';
 import { useExpenses } from '../../hooks/useExpenses';
+import { getCurrency } from '../../lib/currencies';
 import { Transfer } from '../../types';
 import { EmptyState } from '../ui/EmptyState';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
+import { Avatar } from '../ui/Avatar';
 
 interface Props { transfers: Transfer[]; }
 
 function RecordPaymentModal({ onClose }: { onClose: () => void }) {
-  const { user, members } = useStore();
+  const { user, members, groups, currentGroupId, addToast } = useStore();
   const { addSettlement } = useExpenses();
-  const others = members.filter(m => m.uid !== user?.uid);
+  const group = groups.find(g => g.id === currentGroupId);
+  const currency = group?.currency || 'USD';
+  const symbol = getCurrency(currency).symbol;
+
   const [from, setFrom] = useState(user?.uid || '');
-  const [to, setTo] = useState(others[0]?.uid || '');
+  const initialTo = members.find(m => m.uid !== user?.uid)?.uid || '';
+  const [to, setTo] = useState(initialTo);
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
-  const { addToast } = useStore();
 
   const handleSubmit = async () => {
     const amt = parseFloat(amount);
@@ -37,6 +42,7 @@ function RecordPaymentModal({ onClose }: { onClose: () => void }) {
       toName: toMember.displayName,
       toPhoto: toMember.photoURL,
       amount: amt,
+      currency,
       note: note.trim() || undefined,
     });
     setLoading(false);
@@ -80,7 +86,7 @@ function RecordPaymentModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div>
-            <label className="label">المبلغ ($)</label>
+            <label className="label">المبلغ ({symbol})</label>
             <input
               className="input"
               type="number"
@@ -117,10 +123,14 @@ function RecordPaymentModal({ onClose }: { onClose: () => void }) {
 }
 
 export function SettlementsView({ transfers }: Props) {
-  const { user, settlements } = useStore();
-  const { addSettlement } = useExpenses();
+  const { user, settlements, groups, currentGroupId } = useStore();
+  const { addSettlement, deleteSettlement } = useExpenses();
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
   const [showRecord, setShowRecord] = useState(false);
+
+  const group = groups.find(g => g.id === currentGroupId);
+  const groupCurrency = group?.currency || 'USD';
+  const groupSymbol = getCurrency(groupCurrency).symbol;
 
   const handleSettle = async (t: Transfer) => {
     const key = `${t.from}-${t.to}`;
@@ -133,8 +143,14 @@ export function SettlementsView({ transfers }: Props) {
       toName: t.toName,
       toPhoto: t.toPhoto,
       amount: t.amount,
+      currency: groupCurrency,
     });
     setLoadingKey(null);
+  };
+
+  const handleDelete = (id: string) => {
+    if (!confirm('هل تريد حذف هذه التسوية؟')) return;
+    deleteSettlement(id);
   };
 
   const isEmpty = transfers.length === 0 && settlements.length === 0;
@@ -161,39 +177,28 @@ export function SettlementsView({ transfers }: Props) {
               const isInvolved = t.from === user?.uid || t.to === user?.uid;
               return (
                 <div key={i} className={`card p-4 flex items-center gap-3 ${isInvolved ? 'border-emerald-500/20' : ''}`}>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {t.fromPhoto
-                      ? <img src={t.fromPhoto} alt={t.fromName} className="w-9 h-9 rounded-full" />
-                      : <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center text-slate-400 text-xs">{t.fromName[0]}</div>
-                    }
-                  </div>
+                  <Avatar uid={t.from} name={t.fromName} photoURL={t.fromPhoto} size="sm" />
                   <div className="flex-1 min-w-0">
                     <p className="text-white text-sm">
                       <span className="font-medium">{t.from === user?.uid ? 'أنت' : t.fromName}</span>
                       <span className="text-slate-400 mx-1">→</span>
                       <span className="font-medium">{t.to === user?.uid ? 'أنت' : t.toName}</span>
                     </p>
-                    <p className="text-emerald-400 font-bold">{t.amount.toFixed(2)} $</p>
+                    <p className="text-emerald-400 font-bold">{t.amount.toFixed(2)} {groupSymbol}</p>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {t.toPhoto
-                      ? <img src={t.toPhoto} alt={t.toName} className="w-9 h-9 rounded-full" />
-                      : <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center text-slate-400 text-xs">{t.toName[0]}</div>
-                    }
-                    {/* both payer and receiver can confirm */}
-                    {isInvolved && (
-                      <button
-                        onClick={() => handleSettle(t)}
-                        disabled={loadingKey === key}
-                        className="btn-primary text-xs flex items-center gap-1.5"
-                      >
-                        {loadingKey === key
-                          ? <LoadingSpinner size="sm" />
-                          : <><CheckCircle size={13} /> تمّت</>
-                        }
-                      </button>
-                    )}
-                  </div>
+                  <Avatar uid={t.to} name={t.toName} photoURL={t.toPhoto} size="sm" />
+                  {isInvolved && (
+                    <button
+                      onClick={() => handleSettle(t)}
+                      disabled={loadingKey === key}
+                      className="btn-primary text-xs flex items-center gap-1.5"
+                    >
+                      {loadingKey === key
+                        ? <LoadingSpinner size="sm" />
+                        : <><CheckCircle size={13} /> تمّت</>
+                      }
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -205,31 +210,36 @@ export function SettlementsView({ transfers }: Props) {
         <div>
           <p className="text-slate-500 text-xs mb-3">سجل الدفعات المسجّلة</p>
           <div className="space-y-2">
-            {settlements.map(s => (
-              <div key={s.id} className="card p-4 flex items-center gap-3">
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {s.fromPhoto
-                    ? <img src={s.fromPhoto} alt={s.fromName} className="w-9 h-9 rounded-full opacity-80" />
-                    : <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center text-slate-400 text-xs">{s.fromName[0]}</div>
-                  }
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-slate-300 text-sm">
-                    <span className="font-medium">{s.from === user?.uid ? 'أنت' : s.fromName}</span>
-                    <span className="text-slate-500 mx-1">دفع لـ</span>
-                    <span className="font-medium">{s.to === user?.uid ? 'أنت' : s.toName}</span>
-                  </p>
-                  <p className="text-slate-500 text-xs">
-                    {format(new Date(s.settledAt), 'dd MMM yyyy', { locale: ar })}
-                    {s.note && <span className="text-slate-600"> · {s.note}</span>}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-slate-400 font-medium text-sm">{s.amount.toFixed(2)} $</span>
+            {settlements.map(s => {
+              const symbol = getCurrency(s.currency || groupCurrency).symbol;
+              const canDelete = s.createdBy === user?.uid;
+              return (
+                <div key={s.id} className="card p-4 flex items-center gap-3">
+                  <Avatar uid={s.from} name={s.fromName} photoURL={s.fromPhoto} size="sm" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-slate-300 text-sm">
+                      <span className="font-medium">{s.from === user?.uid ? 'أنت' : s.fromName}</span>
+                      <span className="text-slate-500 mx-1">دفع لـ</span>
+                      <span className="font-medium">{s.to === user?.uid ? 'أنت' : s.toName}</span>
+                    </p>
+                    <p className="text-slate-500 text-xs">
+                      {format(new Date(s.settledAt), 'dd MMM yyyy', { locale: ar })}
+                      {s.note && <span className="text-slate-600"> · {s.note}</span>}
+                    </p>
+                  </div>
+                  <span className="text-slate-400 font-medium text-sm">{s.amount.toFixed(2)} {symbol}</span>
                   <CheckCircle className="text-emerald-500" size={16} />
+                  {canDelete && (
+                    <button
+                      onClick={() => handleDelete(s.id)}
+                      className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

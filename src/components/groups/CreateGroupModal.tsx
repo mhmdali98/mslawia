@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, ChevronDown } from 'lucide-react';
 import { useGroups } from '../../hooks/useGroups';
 import { useStore } from '../../store/useStore';
+import { CURRENCIES } from '../../lib/currencies';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 
 interface Props { onClose: () => void; }
@@ -10,6 +11,7 @@ export function CreateGroupModal({ onClose }: Props) {
   const [tab, setTab] = useState<'create' | 'join'>('create');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [currency, setCurrency] = useState('USD');
   const [inviteCode, setInviteCode] = useState('');
   const [loading, setLoading] = useState(false);
   const { createGroup, joinByInvite } = useGroups();
@@ -18,7 +20,7 @@ export function CreateGroupModal({ onClose }: Props) {
   const handleCreate = async () => {
     if (!name.trim()) { addToast('أدخل اسم المجموعة.', 'error'); return; }
     setLoading(true);
-    await createGroup(name.trim(), description.trim());
+    await createGroup(name.trim(), description.trim(), currency);
     setLoading(false);
     onClose();
   };
@@ -78,6 +80,23 @@ export function CreateGroupModal({ onClose }: Props) {
                 value={description}
                 onChange={e => setDescription(e.target.value)}
               />
+            </div>
+            <div>
+              <label className="label">العملة</label>
+              <div className="relative">
+                <select
+                  className="input appearance-none cursor-pointer"
+                  value={currency}
+                  onChange={e => setCurrency(e.target.value)}
+                >
+                  {CURRENCIES.map(c => (
+                    <option key={c.code} value={c.code}>
+                      {c.nameAr} ({c.symbol})
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+              </div>
             </div>
             <button
               onClick={handleCreate}
