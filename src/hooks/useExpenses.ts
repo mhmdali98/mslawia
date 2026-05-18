@@ -45,11 +45,11 @@ export function useExpenses() {
       return;
     }
     try {
-      await addDoc(collection(db, 'groups', gid, 'expenses'), {
-        ...data,
-        groupId: gid,
-        createdAt: new Date().toISOString(),
-      });
+      const payload = Object.fromEntries(
+        Object.entries({ ...data, groupId: gid, createdAt: new Date().toISOString() })
+          .filter(([, v]) => v !== undefined)
+      );
+      await addDoc(collection(db, 'groups', gid, 'expenses'), payload);
       addToast('تمت إضافة المصروف!', 'success');
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -87,11 +87,11 @@ export function useExpenses() {
       return;
     }
     try {
-      await addDoc(collection(db, 'groups', gid, 'settlements'), {
-        ...data,
-        groupId: gid,
-        settledAt: new Date().toISOString(),
-      });
+      const payload = Object.fromEntries(
+        Object.entries({ ...data, groupId: gid, settledAt: new Date().toISOString() })
+          .filter(([, v]) => v !== undefined)
+      );
+      await addDoc(collection(db, 'groups', gid, 'settlements'), payload);
       addToast('تم تسجيل التسوية!', 'success');
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
