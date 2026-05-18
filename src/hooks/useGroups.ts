@@ -1,17 +1,19 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import {
   collection, onSnapshot, deleteDoc, doc,
   setDoc, getDoc, query, where, writeBatch,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useStore } from '../store/useStore';
+import { notify } from '../store/useNotifications';
 import { Group, GroupMember } from '../types';
 
 export function useGroups() {
   const { user, setGroups, setMembers, currentGroupId, addToast } = useStore();
+  const firstGroupSnap = useRef(true);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) { firstGroupSnap.current = true; return; }
 
     const memberGroupsQuery = query(
       collection(db, 'groups'),
@@ -24,6 +26,15 @@ export function useGroups() {
         const groups: Group[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as Group));
         setGroups(groups);
         useStore.getState().setGroupsLoaded(true);
+        if (firstGroupSnap.current) { firstGroupSnap.current = false; return; }
+        for (const change of snap.docChanges()) {
+          if (change.type !== 'added') continue;
+          const g = change.doc.data() as Group;
+          if (g.createdBy === user.uid) continue;
+          if (snap.metadata.hasPendingWrites) continue;
+          addToast(`تمت إضافتك إلى ${g.name}`, 'info');
+          notify('مجموعة جديدة', `تمت إضافتك إلى ${g.name}`, `grp-${change.doc.id}`);
+        }
       },
       (error) => { console.error('Groups listener error:', error.code, error.message); }
     );
