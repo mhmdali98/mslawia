@@ -13,12 +13,16 @@ export function useExpenses() {
     const expQ = query(collection(db, 'groups', currentGroupId, 'expenses'), orderBy('date', 'desc'));
     const setQ = query(collection(db, 'groups', currentGroupId, 'settlements'), orderBy('settledAt', 'desc'));
 
-    const unsubExp = onSnapshot(expQ, (snap) => {
-      setExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() } as Expense)));
-    });
-    const unsubSet = onSnapshot(setQ, (snap) => {
-      setSettlements(snap.docs.map(d => ({ id: d.id, ...d.data() } as Settlement)));
-    });
+    const unsubExp = onSnapshot(
+      expQ,
+      (snap) => { setExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() } as Expense))); },
+      (error) => { console.error('Expenses listener error:', error.message); }
+    );
+    const unsubSet = onSnapshot(
+      setQ,
+      (snap) => { setSettlements(snap.docs.map(d => ({ id: d.id, ...d.data() } as Settlement))); },
+      (error) => { console.error('Settlements listener error:', error.message); }
+    );
 
     return () => { unsubExp(); unsubSet(); };
   }, [currentGroupId, setExpenses, setSettlements]);
