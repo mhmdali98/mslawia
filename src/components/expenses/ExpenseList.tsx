@@ -12,16 +12,8 @@ import { ExpenseSkeleton } from '../ui/Skeleton';
 import { Avatar } from '../ui/Avatar';
 import { ExpenseFormModal } from './ExpenseFormModal';
 import { Expense } from '../../types';
-
-const MONTH_NAMES = [
-  'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
-  'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
-];
-
-function monthLabel(dateStr: string) {
-  const [y, m] = dateStr.slice(0, 7).split('-');
-  return `${MONTH_NAMES[parseInt(m, 10) - 1]} ${y}`;
-}
+import { useMonthName } from '../../lib/i18n';
+import { useNickname } from '../../hooks/useNickname';
 
 export function ExpenseList() {
   const { expenses, user, members, groups, currentGroupId, expensesLoaded } = useStore();
@@ -30,10 +22,18 @@ export function ExpenseList() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
+  const monthName = useMonthName();
 
   const group = groups.find(g => g.id === currentGroupId);
   const defaultCurrency = group?.currency || 'USD';
   const isOwner = group?.createdBy === user?.uid;
+
+  const getMonthLabel = (dateStr: string) => {
+    const [y, m] = dateStr.slice(0, 7).split('-');
+    return `${monthName(parseInt(m, 10))} ${y}`;
+  };
+
+  const getNickname = useNickname(currentGroupId || undefined);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -167,6 +167,8 @@ export function ExpenseList() {
             user={user}
             members={members}
             defaultCurrency={defaultCurrency}
+            getMonthLabel={getMonthLabel}
+            getNickname={getNickname}
           />
           {visibleCount < filtered.length && (
             <div ref={sentinelRef} className="py-4 flex flex-col items-center gap-2">
@@ -202,10 +204,12 @@ interface ItemsProps {
   user: { uid: string } | null;
   members: { uid: string; displayName: string; photoURL: string }[];
   defaultCurrency: string;
+  getMonthLabel: (dateStr: string) => string;
+  getNickname: (uid: string, fallback: string) => string;
 }
 
 function ExpenseListItems({
-  filtered, expanded, toggleExpand, canEdit, setEditing, handleDelete, user, members, defaultCurrency,
+  filtered, expanded, toggleExpand, canEdit, setEditing, handleDelete, user, members, defaultCurrency, getMonthLabel, getNickname,
 }: ItemsProps) {
   let lastMonth = '';
 
@@ -227,7 +231,7 @@ function ExpenseListItems({
           <div key={expense.id}>
             {isNewMonth && (
               <p className="text-slate-500 text-xs font-medium px-1 pt-3 pb-2">
-                {monthLabel(expense.date)}
+                {getMonthLabel(expense.date)}
               </p>
             )}
             <div className="card overflow-hidden">
@@ -250,7 +254,11 @@ function ExpenseListItems({
                         </button>
                         <p className="text-slate-500 text-xs mt-0.5">
                           {expense.paidByName} · {format(new Date(expense.date), 'dd MMM', { locale: ar })}
-                          {expense.updatedAt && <span className="text-slate-600"> · مُعدَّل</span>}
+                          {expense.updatedAt && (
+                            <span className="text-slate-600">
+                              · مُعدَّل{expense.updatedByName ? ` بواسطة ${expense.updatedByName}` : ''}
+                            </span>
+                          )}
                         </p>
                       </div>
                       <span className="text-white font-bold flex-shrink-0">{expense.amount.toFixed(2)} {symbol}</span>
@@ -312,7 +320,7 @@ function ExpenseListItems({
                       <div key={s.uid} className="flex items-center gap-2.5">
                         <Avatar uid={s.uid} name={member?.displayName || '?'} photoURL={member?.photoURL} size="xs" />
                         <span className="text-slate-300 text-xs flex-1">
-                          {s.uid === user?.uid ? 'أنت' : member?.displayName || '؟'}
+                          {s.uid === user?.uid ? 'أنت' : getNickname(s.uid, member?.displayName || '؟')}
                           {isPayer && <span className="text-emerald-500 text-xs mr-1">(دافع)</span>}
                         </span>
                         <span className={`text-xs font-medium ${isPayer ? 'text-emerald-400' : 'text-red-400'}`}>

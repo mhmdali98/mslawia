@@ -20,6 +20,7 @@ import { GroupStats } from './GroupStats';
 import { getGroupCategory } from '../../lib/categories';
 import { confirmAction } from '../../store/useConfirm';
 import { usePagination } from '../../hooks/usePagination';
+import { useNickname } from '../../hooks/useNickname';
 
 type Tab = 'expenses' | 'balances' | 'settlements' | 'activity' | 'stats';
 
@@ -70,6 +71,7 @@ export function GroupPage() {
   const settlementsData = settlements.map(s => ({ from: s.from, to: s.to, amount: s.amount }));
   const balances = calculateBalances(expenses, settlementsData, members);
   const transfers = calculateMinTransfers(balances);
+  const getNickname = useNickname(group.id);
 
   const handleCopyInvite = async () => {
     const code = await createInvite(group.id, group.name);
@@ -243,100 +245,107 @@ export function GroupPage() {
             {balances.length === 0 || balances.every(b => Math.abs(b.amount) < 0.01) ? (
               <EmptyState icon={Users} title="جميع الأرصدة مسوّاة" description="لا يوجد ديون حالياً في المجموعة" />
             ) : (
-              balancesPage.visible.map(b => {
-                const isSelected = selectedBalance === b.uid;
-                const owes = transfers.filter(t => t.from === b.uid);
-                const owedBy = transfers.filter(t => t.to === b.uid);
-                const hasDetail = owes.length > 0 || owedBy.length > 0;
-                return (
-                  <div key={b.uid}>
-                    <button
-                      onClick={() => setSelectedBalance(isSelected ? null : b.uid)}
-                      className={`card p-4 flex items-center gap-3 w-full text-right transition-colors ${hasDetail ? 'hover:bg-slate-800/60 cursor-pointer' : 'cursor-default'} ${isSelected ? 'ring-1 ring-slate-600' : ''}`}
-                    >
-                      <Avatar uid={b.uid} name={b.displayName} photoURL={b.photoURL} size="md" />
-                      <div className="flex-1">
-                        <p className="text-white font-medium text-sm">
-                          {b.uid === user?.uid ? 'أنت' : b.displayName}
-                        </p>
-                        <p className="text-slate-500 text-xs">
-                          {Math.abs(b.amount) < 0.01 ? 'مسوّى' : b.amount > 0 ? 'يستحق' : 'مدين'}
-                          {hasDetail && <span className="mr-1 text-slate-600">· اضغط للتفاصيل</span>}
-                        </p>
-                      </div>
-                      <span className={`font-bold ${
-                        Math.abs(b.amount) < 0.01 ? 'text-slate-500' :
-                        b.amount > 0 ? 'text-emerald-400' : 'text-red-400'
-                      }`}>
-                        {Math.abs(b.amount) < 0.01 ? '0.00' : (b.amount > 0 ? '+' : '')}{b.amount.toFixed(2)} {symbol}
-                      </span>
-                    </button>
-                    {isSelected && hasDetail && (
-                      <div className="mx-2 bg-slate-900 border border-slate-700 border-t-0 rounded-b-xl px-4 py-3 space-y-2">
-                        {owes.map((t, i) => (
-                          <div key={i} className="flex items-center gap-2">
-                            <Avatar uid={t.to} name={t.toName} photoURL={t.toPhoto} size="xs" />
-                            <span className="text-slate-400 text-xs flex-1">
-                              مدين لـ <span className="text-white font-medium">{t.to === user?.uid ? 'أنت' : t.toName}</span>
-                            </span>
-                            <span className="text-red-400 text-xs font-bold">{t.amount.toFixed(2)} {symbol}</span>
-                          </div>
-                        ))}
-                        {owedBy.map((t, i) => (
-                          <div key={i} className="flex items-center gap-2">
-                            <Avatar uid={t.from} name={t.fromName} photoURL={t.fromPhoto} size="xs" />
-                            <span className="text-slate-400 text-xs flex-1">
-                              <span className="text-white font-medium">{t.from === user?.uid ? 'أنت' : t.fromName}</span> مدين له
-                            </span>
-                            <span className="text-emerald-400 text-xs font-bold">{t.amount.toFixed(2)} {symbol}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+              <>
+                {new Set(expenses.map(e => e.currency || group.currency)).size > 1 && (
+                  <div className="mb-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs">
+                    تحتوي المجموعة على مصاريف بعملات مختلفة — الأرصدة المعروضة تجمع كل العملات بدون تحويل
                   </div>
-                );
-              })
-            )}
-            {balancesPage.hasMore && (
-              <div ref={balancesPage.sentinelRef} className="py-3 flex justify-center">
-                <button
-                  onClick={balancesPage.loadMore}
-                  className="text-slate-400 hover:text-slate-200 text-xs font-medium px-4 py-2 rounded-lg border border-slate-700 hover:border-slate-600 transition-colors"
-                >
-                  عرض المزيد ({balancesPage.remaining})
-                </button>
-              </div>
-            )}
-            {transfers.length > 0 && (
-              <div className="mt-6">
-                <h3 className="text-slate-400 text-sm font-medium mb-3">التحويلات المقترحة</h3>
-                <div className="space-y-2">
-                  {balanceTransfersPage.visible.map((t, i) => (
-                    <div key={i} className="card p-4 flex items-center gap-3">
-                      <Avatar uid={t.from} name={t.fromName} photoURL={t.fromPhoto} size="sm" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-white text-sm">
-                          <span className="font-medium">{t.from === user?.uid ? 'أنت' : t.fromName}</span>
-                          <span className="text-slate-400 mx-1">→</span>
-                          <span className="font-medium">{t.to === user?.uid ? 'أنت' : t.toName}</span>
-                        </p>
-                      </div>
-                      <Avatar uid={t.to} name={t.toName} photoURL={t.toPhoto} size="sm" />
-                      <span className="font-bold text-emerald-400 mr-2">{t.amount.toFixed(2)} {symbol}</span>
+                )}
+                {balancesPage.visible.map(b => {
+                  const isSelected = selectedBalance === b.uid;
+                  const owes = transfers.filter(t => t.from === b.uid);
+                  const owedBy = transfers.filter(t => t.to === b.uid);
+                  const hasDetail = owes.length > 0 || owedBy.length > 0;
+                  return (
+                    <div key={b.uid}>
+                      <button
+                        onClick={() => setSelectedBalance(isSelected ? null : b.uid)}
+                        className={`card p-4 flex items-center gap-3 w-full text-right transition-colors ${hasDetail ? 'hover:bg-slate-800/60 cursor-pointer' : 'cursor-default'} ${isSelected ? 'ring-1 ring-slate-600' : ''}`}
+                      >
+                        <Avatar uid={b.uid} name={b.displayName} photoURL={b.photoURL} size="md" />
+                        <div className="flex-1">
+                          <p className="text-white font-medium text-sm">
+                            {b.uid === user?.uid ? 'أنت' : getNickname(b.uid, b.displayName)}
+                          </p>
+                          <p className="text-slate-500 text-xs">
+                            {Math.abs(b.amount) < 0.01 ? 'مسوّى' : b.amount > 0 ? 'يستحق' : 'مدين'}
+                            {hasDetail && <span className="mr-1 text-slate-600">· اضغط للتفاصيل</span>}
+                          </p>
+                        </div>
+                        <span className={`font-bold ${
+                          Math.abs(b.amount) < 0.01 ? 'text-slate-500' :
+                          b.amount > 0 ? 'text-emerald-400' : 'text-red-400'
+                        }`}>
+                          {Math.abs(b.amount) < 0.01 ? '0.00' : (b.amount > 0 ? '+' : '')}{b.amount.toFixed(2)} {symbol}
+                        </span>
+                      </button>
+                      {isSelected && hasDetail && (
+                        <div className="mx-2 bg-slate-900 border border-slate-700 border-t-0 rounded-b-xl px-4 py-3 space-y-2">
+                          {owes.map((t, i) => (
+                            <div key={i} className="flex items-center gap-2">
+                              <Avatar uid={t.to} name={t.toName} photoURL={t.toPhoto} size="xs" />
+                              <span className="text-slate-400 text-xs flex-1">
+                                يدفع لـ <span className="text-white font-medium">{t.to === user?.uid ? 'أنت' : getNickname(t.to, t.toName)}</span>
+                              </span>
+                              <span className="text-red-400 text-xs font-bold">{t.amount.toFixed(2)} {symbol}</span>
+                            </div>
+                          ))}
+                          {owedBy.map((t, i) => (
+                            <div key={i} className="flex items-center gap-2">
+                              <Avatar uid={t.from} name={t.fromName} photoURL={t.fromPhoto} size="xs" />
+                              <span className="text-slate-400 text-xs flex-1">
+                                <span className="text-white font-medium">{t.from === user?.uid ? 'أنت' : getNickname(t.from, t.fromName)}</span> يستلم من
+                              </span>
+                              <span className="text-emerald-400 text-xs font-bold">{t.amount.toFixed(2)} {symbol}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  ))}
-                </div>
-                {balanceTransfersPage.hasMore && (
-                  <div ref={balanceTransfersPage.sentinelRef} className="py-3 flex justify-center">
+                  );
+                })}
+                {balancesPage.hasMore && (
+                  <div ref={balancesPage.sentinelRef} className="py-3 flex justify-center">
                     <button
-                      onClick={balanceTransfersPage.loadMore}
+                      onClick={balancesPage.loadMore}
                       className="text-slate-400 hover:text-slate-200 text-xs font-medium px-4 py-2 rounded-lg border border-slate-700 hover:border-slate-600 transition-colors"
                     >
-                      عرض المزيد ({balanceTransfersPage.remaining})
+                      عرض المزيد ({balancesPage.remaining})
                     </button>
                   </div>
                 )}
-              </div>
+                {transfers.length > 0 && (
+                  <div className="mt-6">
+                    <h3 className="text-slate-400 text-sm font-medium mb-3">التحويلات المقترحة</h3>
+                    <div className="space-y-2">
+                      {balanceTransfersPage.visible.map((t, i) => (
+                        <div key={i} className="card p-4 flex items-center gap-3">
+                          <Avatar uid={t.from} name={t.fromName} photoURL={t.fromPhoto} size="sm" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white text-sm">
+                              <span className="font-medium">{t.from === user?.uid ? 'أنت' : getNickname(t.from, t.fromName)}</span>
+                              <span className="text-slate-400 mx-1">→</span>
+                              <span className="font-medium">{t.to === user?.uid ? 'أنت' : getNickname(t.to, t.toName)}</span>
+                            </p>
+                          </div>
+                          <Avatar uid={t.to} name={t.toName} photoURL={t.toPhoto} size="sm" />
+                          <span className="font-bold text-emerald-400 mr-2">{t.amount.toFixed(2)} {symbol}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {balanceTransfersPage.hasMore && (
+                      <div ref={balanceTransfersPage.sentinelRef} className="py-3 flex justify-center">
+                        <button
+                          onClick={balanceTransfersPage.loadMore}
+                          className="text-slate-400 hover:text-slate-200 text-xs font-medium px-4 py-2 rounded-lg border border-slate-700 hover:border-slate-600 transition-colors"
+                        >
+                          عرض المزيد ({balanceTransfersPage.remaining})
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}

@@ -4,6 +4,7 @@ import App from './App.tsx'
 import './index.css'
 import { useLocale } from './lib/i18n'
 import { registerInstallListeners } from './store/useInstall'
+import { logError } from './lib/logger'
 
 // Apply persisted locale direction on boot
 const initialLocale = useLocale.getState().locale;
@@ -22,6 +23,6 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker
       .register('/mslawia/sw.js', { scope: '/mslawia/' })
-      .catch((err) => console.warn('SW registration failed:', err));
+      .catch((err) => logError('SW', err));
   });
 }
