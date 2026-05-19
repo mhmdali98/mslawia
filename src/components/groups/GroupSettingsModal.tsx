@@ -187,7 +187,7 @@ export function GroupSettingsModal({ group, onClose }: Props) {
                     <span className="text-slate-300 text-sm">تبسيط الديون</span>
                     <p className="text-slate-500 text-xs mt-0.5">
                       {simplifyDebts
-                        ? 'يقلل عدد التحويلات بدمج الديون (مثل Splitwise)'
+                        ? 'يقلل عدد التحويلات بدمج الديون'
                         : 'يُظهر الديون المباشرة بين كل شخصين'}
                     </p>
                   </div>
