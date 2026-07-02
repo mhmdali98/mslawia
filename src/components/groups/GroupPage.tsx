@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowRight, Plus, Receipt, Home, MoreHorizontal,
-  Copy, Trash2, LogOut, Download, MoreVertical, Settings, Activity, BarChart3, History,
+  UserPlus, Trash2, LogOut, Download, MoreVertical, Settings, Activity, BarChart3, History,
   CheckCircle, Scale,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
@@ -10,7 +10,7 @@ import { useGroupData } from '../../hooks/useListeners';
 import { useSettle } from '../../hooks/useSettle';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { useNickname } from '../../hooks/useNickname';
-import { createInvite, deleteGroup, leaveGroup, exportBackup } from '../../lib/actions';
+import { deleteGroup, leaveGroup, exportBackup } from '../../lib/actions';
 import { getPerms } from '../../lib/permissions';
 import { computeDebts, sortExpensesDesc } from '../../lib/calculations';
 import { getCurrency } from '../../lib/currencies';
@@ -24,6 +24,7 @@ import { EmptyState } from '../ui/EmptyState';
 import { Avatar } from '../ui/Avatar';
 import { LoadingSpinner, FullPageLoader } from '../ui/LoadingSpinner';
 import { GroupSettingsModal } from './GroupSettingsModal';
+import { InviteModal } from './InviteModal';
 import { ActivityFeed } from '../activity/ActivityFeed';
 import { GroupStats } from './GroupStats';
 import { BalancesView } from './BalancesView';
@@ -34,13 +35,14 @@ type MoreSubTab = 'activity' | 'stats' | 'history';
 export function GroupPage() {
   const { groupId } = useParams<{ groupId: string }>();
   const navigate = useNavigate();
-  const { user, groups, members, expenses, settlements, groupsLoaded, addToast, cacheGroupBalance } = useStore();
+  const { user, groups, members, expenses, settlements, groupsLoaded, cacheGroupBalance } = useStore();
   useGroupData(groupId);
 
   const [tab, setTab] = useState<Tab>('home');
   const [moreTab, setMoreTab] = useState<MoreSubTab>('activity');
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useClickOutside(showMenu, () => setShowMenu(false));
 
@@ -83,19 +85,6 @@ export function GroupPage() {
   const groupCat = getGroupCategory(group.category);
   const GroupCatIcon = groupCat.icon;
   const recentExpenses = [...expenses].sort(sortExpensesDesc).slice(0, 5);
-
-  const handleCopyInvite = async () => {
-    const code = await createInvite(group.id, group.name);
-    if (code) {
-      const link = `${window.location.origin}/mslawia/join/${code}`;
-      try {
-        await navigator.clipboard.writeText(link);
-        addToast('تم نسخ رابط الدعوة!', 'success');
-      } catch {
-        addToast(`رابط الدعوة: ${link}`, 'info');
-      }
-    }
-  };
 
   const handleDelete = async () => {
     const ok = await confirmAction({
@@ -142,11 +131,11 @@ export function GroupPage() {
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
             <button
-              onClick={handleCopyInvite}
+              onClick={() => setShowInvite(true)}
               aria-label="دعوة عضو"
               className="p-2 rounded-xl text-slate-400 hover:text-emerald-400 hover:bg-slate-800 transition-colors"
             >
-              <Copy size={18} />
+              <UserPlus size={18} />
             </button>
             {canAddExpense && (
               <button
@@ -373,6 +362,12 @@ export function GroupPage() {
         <GroupSettingsModal
           group={group}
           onClose={() => setShowSettings(false)}
+        />
+      )}
+      {showInvite && (
+        <InviteModal
+          group={group}
+          onClose={() => setShowInvite(false)}
         />
       )}
     </div>
