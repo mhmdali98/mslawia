@@ -47,7 +47,6 @@ export function ExpenseFormModal({ onClose, expense, defaultCurrency = 'USD' }: 
   // Show advanced section automatically when editing with non-default advanced fields
   const [showAdvanced, setShowAdvanced] = useState(
     !!expense && (
-      expense.splitType !== 'equal' ||
       expense.category !== 'other' ||
       !!expense.note ||
       expense.date !== new Date().toISOString().slice(0, 10)
@@ -200,31 +199,31 @@ export function ExpenseFormModal({ onClose, expense, defaultCurrency = 'USD' }: 
               <label className="label">الفئة</label>
               <CategoryPicker categories={EXPENSE_CATEGORIES} value={category} onChange={setCategory} />
             </div>
-
-            <div>
-              <label className="label">طريقة التقسيم</label>
-              <div className="flex gap-2">
-                {([
-                  { key: 'equal', label: 'متساوٍ' },
-                  { key: 'percentage', label: 'نسب %' },
-                  { key: 'custom', label: 'مخصص' },
-                ] as const).map(({ key, label }) => (
-                  <button
-                    key={key}
-                    onClick={() => setSplitType(key)}
-                    className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-colors ${
-                      splitType === key
-                        ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
-                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
         )}
+
+        <div>
+          <label className="label">طريقة التقسيم</label>
+          <div className="flex gap-2">
+            {([
+              { key: 'equal', label: 'متساوٍ' },
+              { key: 'percentage', label: 'نسب %' },
+              { key: 'custom', label: 'مخصص' },
+            ] as const).map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setSplitType(key)}
+                className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-colors ${
+                  splitType === key
+                    ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
+                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <div>
           <label className="label">المشاركون</label>
