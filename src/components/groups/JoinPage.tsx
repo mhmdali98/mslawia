@@ -8,17 +8,20 @@ export function JoinPage() {
   const { code } = useParams<{ code: string }>();
   const user = useStore(s => s.user);
   const navigate = useNavigate();
-  const [status, setStatus] = useState<'joining' | 'done' | 'error'>('joining');
+  const [status, setStatus] = useState<'joining' | 'error'>('joining');
   const attempted = useRef(false);
 
   useEffect(() => {
     if (!code || !user || attempted.current) return;
     attempted.current = true; // guard against double-invocation (StrictMode / re-renders)
     joinByInvite(code.toUpperCase()).then(groupId => {
-      setStatus(groupId ? 'done' : 'error');
-      setTimeout(() => {
-        navigate(groupId ? `/group/${groupId}` : '/', { replace: true });
-      }, 1500);
+      if (groupId) {
+        // straight into the group — the success toast is confirmation enough
+        navigate(`/group/${groupId}`, { replace: true });
+      } else {
+        setStatus('error');
+        setTimeout(() => navigate('/', { replace: true }), 1500);
+      }
     });
   }, [code, user, navigate]);
 
@@ -29,13 +32,6 @@ export function JoinPage() {
           <>
             <LoadingSpinner size="lg" />
             <p className="text-slate-300 mt-4">جارٍ الانضمام للمجموعة...</p>
-          </>
-        )}
-        {status === 'done' && (
-          <>
-            <div className="text-4xl mb-3">✅</div>
-            <p className="text-white font-semibold">تم الانضمام بنجاح!</p>
-            <p className="text-slate-400 text-sm mt-1">جارٍ التوجيه...</p>
           </>
         )}
         {status === 'error' && (
