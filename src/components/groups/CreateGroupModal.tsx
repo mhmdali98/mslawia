@@ -31,8 +31,15 @@ export function CreateGroupModal({ onClose }: Props) {
     if (groupId) navigate(`/group/${groupId}`);
   };
 
+  // Accepts a raw code or a full invite link and extracts the trailing code.
+  const normalizeCode = (value: string) =>
+    (value.split('/').filter(Boolean).pop() || '')
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .toUpperCase()
+      .slice(0, 8);
+
   const handleJoin = async () => {
-    const code = inviteCode.trim().toUpperCase();
+    const code = normalizeCode(inviteCode);
     if (!code) { addToast('أدخل رمز الدعوة.', 'error'); return; }
     setLoading(true);
     const groupId = await joinByInvite(code);
@@ -105,15 +112,17 @@ export function CreateGroupModal({ onClose }: Props) {
       ) : (
         <div className="space-y-4">
           <div>
-            <label className="label">رمز الدعوة</label>
+            <label className="label">رمز الدعوة أو رابطها</label>
             <input
               className="input font-mono tracking-widest text-center text-lg uppercase"
               placeholder="XXXXXXXX"
               value={inviteCode}
-              onChange={e => setInviteCode(e.target.value)}
-              maxLength={8}
+              onChange={e => setInviteCode(normalizeCode(e.target.value))}
               onKeyDown={e => e.key === 'Enter' && handleJoin()}
             />
+            <p className="text-slate-500 text-xs mt-1.5 text-center">
+              الصق رابط الدعوة كاملاً أو أدخل الرمز فقط — سنستخرج الرمز تلقائياً
+            </p>
           </div>
           <button
             onClick={handleJoin}
