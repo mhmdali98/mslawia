@@ -14,9 +14,28 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 )
 
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker
-      .register('/mslawia/sw.js', { scope: '/mslawia/' })
-      .catch((err) => logError('SW', err));
+  window.addEventListener('load', async () => {
+    try {
+      const reg = await navigator.serviceWorker.register('/mslawia/sw.js', { scope: '/mslawia/' });
+
+      // Check for a new version whenever the app comes back to the foreground
+      // (installed PWAs rarely re-check on their own).
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') reg.update().catch(() => {});
+      });
+
+      // The SW uses skipWaiting, so a new version takes control as soon as it
+      // installs — reload once so the user is on the fresh build immediately.
+      // Skip the very first install: the page is already fresh then.
+      const hadController = !!navigator.serviceWorker.controller;
+      let reloaded = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!hadController || reloaded) return;
+        reloaded = true;
+        window.location.reload();
+      });
+    } catch (err) {
+      logError('SW', err);
+    }
   });
 }

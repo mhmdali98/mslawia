@@ -1,6 +1,6 @@
 // Minimal service worker for Mslawia PWA
 // Cache-first for app shell, network-first for navigation
-const CACHE = 'mslawia-v3';
+const CACHE = 'mslawia-v4';
 const ASSETS = [
   '/mslawia/',
   '/mslawia/index.html',
@@ -74,10 +74,13 @@ self.addEventListener('fetch', (event) => {
     url.host.includes('gstatic.com')
   ) return;
 
-  // Network-first for navigation requests, fallback to cache
+  // Network-first for navigation requests, fallback to cache.
+  // cache: 'no-cache' revalidates with the server instead of trusting the
+  // HTTP cache (GitHub Pages serves index.html with max-age=600, which kept
+  // users on stale builds for up to 10 minutes after each deploy).
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
+      fetch(request, { cache: 'no-cache' })
         .then((res) => {
           const copy = res.clone();
           caches.open(CACHE).then((c) => c.put(request, copy)).catch(() => {});
