@@ -76,15 +76,6 @@ export interface Settlement {
   createdBy: string;
 }
 
-export interface Invite {
-  id: string;
-  groupId: string;
-  groupName: string;
-  createdBy: string;
-  createdAt: string;
-  expiresAt: string;
-}
-
 export interface Balance {
   uid: string;
   displayName: string;

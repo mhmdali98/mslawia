@@ -1,9 +1,7 @@
 import { DollarSign, Users, ArrowLeftRight } from 'lucide-react';
-import { useAuth } from '../../hooks/useAuth';
+import { signInWithGoogle } from '../../lib/actions';
 
 export function LoginPage() {
-  const { signInWithGoogle } = useAuth();
-
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
       <div className="w-full max-w-md">

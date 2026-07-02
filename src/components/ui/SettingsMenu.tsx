@@ -1,26 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
-import { Bell, BellOff, Download, Languages, Settings as SettingsIcon, Check } from 'lucide-react';
+import { useState } from 'react';
+import { Bell, BellOff, Download, Settings as SettingsIcon, Check } from 'lucide-react';
 import { useNotifications } from '../../store/useNotifications';
-import { useLocale } from '../../lib/i18n';
 import { useStore } from '../../store/useStore';
 import { useInstall } from '../../store/useInstall';
+import { useClickOutside } from '../../hooks/useClickOutside';
 
 export function SettingsMenu() {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = useClickOutside(open, () => setOpen(false));
   const { enabled, setEnabled, request } = useNotifications();
-  const { locale, setLocale } = useLocale();
   const { addToast } = useStore();
   const { deferred, installed, promptInstall } = useInstall();
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
 
   const toggleNotifications = async () => {
     if (enabled) {
@@ -92,28 +82,6 @@ export function SettingsMenu() {
               لتثبيت على iPhone: اضغط مشاركة ثم أضف إلى الشاشة الرئيسية
             </p>
           ) : null}
-          <div className="border-t border-slate-700" />
-          <div className="px-4 py-3">
-            <div className="flex items-center gap-2 text-slate-400 text-xs mb-2">
-              <Languages size={14} />
-              <span>{locale === 'ar' ? 'اللغة' : 'Language'}</span>
-            </div>
-            <div className="flex gap-1">
-              {(['ar', 'en'] as const).map(l => (
-                <button
-                  key={l}
-                  onClick={() => setLocale(l)}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    locale === l
-                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500'
-                      : 'bg-slate-700 text-slate-300 border border-slate-600 hover:border-slate-500'
-                  }`}
-                >
-                  {l === 'ar' ? 'العربية' : 'English'}
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
       )}
     </div>

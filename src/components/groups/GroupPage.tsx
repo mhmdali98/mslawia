@@ -1,30 +1,32 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowRight, Plus, Receipt, Home, MoreHorizontal,
   Copy, Trash2, LogOut, Download, MoreVertical, Settings, Activity, BarChart3, History,
-  CheckCircle, ArrowLeftRight, Scale,
+  CheckCircle, Scale,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
-import { useGroups } from '../../hooks/useGroups';
-import { useExpenses } from '../../hooks/useExpenses';
-import { calculateBalances, calculateMinTransfers, calculateDirectDebts } from '../../lib/calculations';
+import { useGroupData } from '../../hooks/useListeners';
+import { useSettle } from '../../hooks/useSettle';
+import { useClickOutside } from '../../hooks/useClickOutside';
+import { useNickname } from '../../hooks/useNickname';
+import { createInvite, deleteGroup, leaveGroup, exportBackup } from '../../lib/actions';
+import { getPerms } from '../../lib/permissions';
+import { computeDebts, sortExpensesDesc } from '../../lib/calculations';
 import { getCurrency } from '../../lib/currencies';
+import { getGroupCategory } from '../../lib/categories';
+import { confirmAction } from '../../store/useConfirm';
 import { ExpenseList } from '../expenses/ExpenseList';
 import { ExpenseFormModal } from '../expenses/ExpenseFormModal';
 import { ExpenseCard } from '../expenses/ExpenseCard';
 import { SettlementsView } from '../settlements/SettlementsView';
 import { EmptyState } from '../ui/EmptyState';
 import { Avatar } from '../ui/Avatar';
-import { LoadingSpinner } from '../ui/LoadingSpinner';
+import { LoadingSpinner, FullPageLoader } from '../ui/LoadingSpinner';
 import { GroupSettingsModal } from './GroupSettingsModal';
 import { ActivityFeed } from '../activity/ActivityFeed';
 import { GroupStats } from './GroupStats';
 import { BalancesView } from './BalancesView';
-import { getGroupCategory } from '../../lib/categories';
-import { confirmAction } from '../../store/useConfirm';
-import { useNickname } from '../../hooks/useNickname';
-import { Expense } from '../../types';
 
 type Tab = 'home' | 'expenses' | 'balances' | 'more';
 type MoreSubTab = 'activity' | 'stats' | 'history';
@@ -32,58 +34,27 @@ type MoreSubTab = 'activity' | 'stats' | 'history';
 export function GroupPage() {
   const { groupId } = useParams<{ groupId: string }>();
   const navigate = useNavigate();
-  const { user, groups, members, expenses, settlements, setCurrentGroupId, addToast, cacheGroupBalance } = useStore();
-  const { createInvite, deleteGroup, leaveGroup } = useGroups();
-  const { exportBackup, addSettlement, deleteExpense } = useExpenses();
+  const { user, groups, members, expenses, settlements, groupsLoaded, addToast, cacheGroupBalance } = useStore();
+  useGroupData(groupId);
+
   const [tab, setTab] = useState<Tab>('home');
   const [moreTab, setMoreTab] = useState<MoreSubTab>('activity');
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
-  const [settlingKey, setSettlingKey] = useState<string | null>(null);
-  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!showMenu) return;
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setShowMenu(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [showMenu]);
+  const menuRef = useClickOutside(showMenu, () => setShowMenu(false));
 
   const group = groups.find(g => g.id === groupId);
+  const { isOwner, canAddExpense, canSettle } = getPerms(group, user?.uid);
+  const getNickname = useNickname(groupId);
+  const { settlingKey, settle } = useSettle(group?.currency || 'USD');
 
-  useEffect(() => {
-    if (groupId) setCurrentGroupId(groupId);
-    return () => setCurrentGroupId(null);
-  }, [groupId, setCurrentGroupId]);
-
-  if (!group) return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-      <div className="text-center">
-        <p className="text-slate-400 mb-4">المجموعة غير موجودة</p>
-        <button onClick={() => navigate('/')} className="btn-secondary">العودة</button>
-      </div>
-    </div>
+  const { balances, transfers } = useMemo(
+    () => group
+      ? computeDebts(group, expenses, settlements, members)
+      : { balances: [], transfers: [] },
+    [group, expenses, settlements, members]
   );
-
-  const isOwner = group.createdBy === user?.uid;
-  const canAddExpense = isOwner || group.permissions?.membersCanAddExpenses !== false;
-  const canSettle = isOwner || group.permissions?.membersCanSettle !== false;
-  const symbol = getCurrency(group.currency).symbol;
-  const groupCat = getGroupCategory(group.category);
-  const GroupCatIcon = groupCat.icon;
-  const settlementsData = settlements.map(s => ({ from: s.from, to: s.to, amount: s.amount }));
-  const balances = calculateBalances(expenses, settlementsData, members);
-  const simplify = group.simplifyDebts !== false;
-  const transfers = simplify
-    ? calculateMinTransfers(balances)
-    : calculateDirectDebts(expenses, settlementsData, members);
-  const getNickname = useNickname(group.id);
 
   const myBalance = balances.find(b => b.uid === user?.uid);
   const myDebts = transfers.filter(t => t.from === user?.uid);
@@ -91,35 +62,27 @@ export function GroupPage() {
 
   // Cache user's balance for Dashboard display
   useEffect(() => {
-    if (user && group && myBalance) {
+    if (group && myBalance) {
       cacheGroupBalance(group.id, myBalance.amount, group.currency);
     }
-  }, [user, group?.id, group?.currency, myBalance?.amount]);
+  }, [group, myBalance?.amount, cacheGroupBalance]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleQuickSettle = async (transfer: typeof transfers[number]) => {
-    const key = `${transfer.from}-${transfer.to}`;
-    const targetName = transfer.to === user?.uid
-      ? getNickname(transfer.from, transfer.fromName)
-      : getNickname(transfer.to, transfer.toName);
-    const ok = await confirmAction({
-      title: 'تأكيد الدفعة',
-      description: `سجّل دفعة بمبلغ ${transfer.amount.toFixed(2)} ${symbol} ${transfer.from === user?.uid ? `لـ ${targetName}` : `من ${targetName}`}؟`,
-      confirmLabel: 'تأكيد',
-    });
-    if (!ok) return;
-    setSettlingKey(key);
-    await addSettlement({
-      from: transfer.from,
-      fromName: transfer.fromName,
-      fromPhoto: transfer.fromPhoto,
-      to: transfer.to,
-      toName: transfer.toName,
-      toPhoto: transfer.toPhoto,
-      amount: transfer.amount,
-      currency: group.currency,
-    });
-    setSettlingKey(null);
-  };
+  if (!group) {
+    if (!groupsLoaded) return <FullPageLoader />;
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-slate-400 mb-4">المجموعة غير موجودة</p>
+          <button onClick={() => navigate('/')} className="btn-secondary">العودة</button>
+        </div>
+      </div>
+    );
+  }
+
+  const symbol = getCurrency(group.currency).symbol;
+  const groupCat = getGroupCategory(group.category);
+  const GroupCatIcon = groupCat.icon;
+  const recentExpenses = [...expenses].sort(sortExpensesDesc).slice(0, 5);
 
   const handleCopyInvite = async () => {
     const code = await createInvite(group.id, group.name);
@@ -157,27 +120,6 @@ export function GroupPage() {
     await leaveGroup(group.id);
     navigate('/');
   };
-
-  const canEditExpense = (e: Expense) => isOwner || e.paidBy === user?.uid || e.createdBy === user?.uid;
-
-  const handleDeleteExpense = async (e: Expense) => {
-    const ok = await confirmAction({
-      title: 'حذف المصروف؟',
-      description: `سيتم حذف "${e.title}" بشكل نهائي.`,
-      confirmLabel: 'حذف',
-      variant: 'danger',
-    });
-    if (!ok) return;
-    deleteExpense(e.id);
-  };
-
-  // Recent 5 expenses sorted newest first
-  const recentExpenses = [...expenses]
-    .sort((a, b) => {
-      if (a.date !== b.date) return a.date < b.date ? 1 : -1;
-      return (a.createdAt || '') < (b.createdAt || '') ? 1 : -1;
-    })
-    .slice(0, 5);
 
   return (
     <div className="min-h-screen bg-slate-950">
@@ -316,7 +258,7 @@ export function GroupPage() {
                   return (
                     <button
                       key={key}
-                      onClick={() => handleQuickSettle(t)}
+                      onClick={() => settle(t)}
                       disabled={settlingKey === key}
                       className="w-full card p-3 flex items-center gap-3 hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-colors text-right disabled:opacity-50"
                     >
@@ -354,7 +296,6 @@ export function GroupPage() {
               </div>
             )}
 
-
             {/* Recent expenses preview */}
             {recentExpenses.length > 0 && (
               <div className="space-y-2">
@@ -367,19 +308,7 @@ export function GroupPage() {
                     عرض الكل ({expenses.length})
                   </button>
                 </div>
-                {recentExpenses.map((e) => (
-                  <ExpenseCard
-                    key={e.id}
-                    expense={e}
-                    user={user}
-                    members={members}
-                    defaultCurrency={group.currency}
-                    canEdit={canEditExpense(e)}
-                    getNickname={getNickname}
-                    onEdit={setEditingExpense}
-                    onDelete={handleDeleteExpense}
-                  />
-                ))}
+                {recentExpenses.map((e) => <ExpenseCard key={e.id} expense={e} />)}
               </div>
             )}
 
@@ -402,12 +331,7 @@ export function GroupPage() {
             balances={balances}
             transfers={transfers}
             symbol={symbol}
-            myUid={user?.uid}
-            canSettle={canSettle}
-            simplifyDebts={simplify}
-            getNickname={getNickname}
-            settlingKey={settlingKey}
-            onSettle={handleQuickSettle}
+            simplifyDebts={group.simplifyDebts !== false}
           />
         )}
 
@@ -435,14 +359,6 @@ export function GroupPage() {
             {moreTab === 'activity' && <ActivityFeed />}
             {moreTab === 'stats' && <GroupStats />}
             {moreTab === 'history' && <SettlementsView transfers={transfers} />}
-
-            {moreTab === 'history' && transfers.length === 0 && settlements.length === 0 && (
-              <EmptyState
-                icon={ArrowLeftRight}
-                title="لا توجد تسويات بعد"
-                description="ستظهر هنا التسويات المقترحة وسجل الدفعات السابقة"
-              />
-            )}
           </div>
         )}
       </div>
@@ -451,13 +367,6 @@ export function GroupPage() {
         <ExpenseFormModal
           onClose={() => setShowAddExpense(false)}
           defaultCurrency={group.currency}
-        />
-      )}
-      {editingExpense && (
-        <ExpenseFormModal
-          expense={editingExpense}
-          defaultCurrency={group.currency}
-          onClose={() => setEditingExpense(null)}
         />
       )}
       {showSettings && (

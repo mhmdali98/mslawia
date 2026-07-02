@@ -1,4 +1,24 @@
-import { Expense, Balance, Transfer, GroupMember, Settlement } from '../types';
+import { Expense, Balance, Transfer, GroupMember, Group, Settlement } from '../types';
+
+// Newest first: by date, then by creation time.
+export function sortExpensesDesc(a: Expense, b: Expense): number {
+  if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+  return (a.createdAt || '') < (b.createdAt || '') ? 1 : -1;
+}
+
+// Balances + suggested transfers for a group, honoring its simplifyDebts setting.
+export function computeDebts(
+  group: Group,
+  expenses: Expense[],
+  settlements: Settlement[],
+  members: GroupMember[]
+): { balances: Balance[]; transfers: Transfer[] } {
+  const balances = calculateBalances(expenses, settlements, members);
+  const transfers = group.simplifyDebts !== false
+    ? calculateMinTransfers(balances)
+    : calculateDirectDebts(expenses, settlements, members);
+  return { balances, transfers };
+}
 
 export function calculateBalances(
   expenses: Expense[],

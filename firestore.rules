@@ -84,6 +84,11 @@ service cloud.firestore {
 
     match /invites/{inviteCode} {
       allow read, create: if isAuth();
+      // any auth user joining via this invite may only bump usedCount by 1
+      // (needed by the atomic join batch); no other field may change
+      allow update: if isAuth() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usedCount']) &&
+        request.resource.data.usedCount == resource.data.get('usedCount', 0) + 1;
       allow delete: if isAuth() && resource.data.createdBy == request.auth.uid;
     }
   }

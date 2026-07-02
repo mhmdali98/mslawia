@@ -23,16 +23,10 @@ export const CURRENCIES: Currency[] = [
   { code: 'TRY', symbol: '₺', name: 'Turkish Lira', nameAr: 'ليرة تركية' },
 ];
 
-export const CURRENCY_MAP: Record<string, Currency> = Object.fromEntries(
+const CURRENCY_MAP: Record<string, Currency> = Object.fromEntries(
   CURRENCIES.map(c => [c.code, c])
 );
 
 export function getCurrency(code: string): Currency {
   return CURRENCY_MAP[code] || CURRENCIES[0];
-}
-
-export function formatAmount(amount: number, currencyCode = 'USD'): string {
-  const c = getCurrency(currencyCode);
-  const abs = Math.abs(amount).toFixed(2);
-  return `${amount < 0 ? '-' : ''}${abs} ${c.symbol}`;
 }

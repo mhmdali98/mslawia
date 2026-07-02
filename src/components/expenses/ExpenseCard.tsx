@@ -2,28 +2,30 @@ import { useState } from 'react';
 import { Trash2, Edit2, ChevronDown, ChevronUp } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { useStore } from '../../store/useStore';
+import { useNickname } from '../../hooks/useNickname';
+import { deleteExpense } from '../../lib/actions';
+import { getPerms } from '../../lib/permissions';
 import { getCurrency } from '../../lib/currencies';
 import { getExpenseCategory } from '../../lib/categories';
 import { Avatar } from '../ui/Avatar';
+import { ExpenseFormModal } from './ExpenseFormModal';
 import { Expense } from '../../types';
 
-interface Props {
-  expense: Expense;
-  user: { uid: string } | null;
-  members: { uid: string; displayName: string; photoURL: string }[];
-  defaultCurrency: string;
-  canEdit: boolean;
-  getNickname: (uid: string, fallback: string) => string;
-  onEdit: (e: Expense) => void;
-  onDelete: (e: Expense) => void;
-}
-
-export function ExpenseCard({ expense, user, members, defaultCurrency, canEdit, getNickname, onEdit, onDelete }: Props) {
+// Self-contained expense row: expand, edit (own modal) and delete (confirm inside action).
+export function ExpenseCard({ expense }: { expense: Expense }) {
+  const { user, members, groups, currentGroupId } = useStore();
   const [expanded, setExpanded] = useState(false);
+  const [editing, setEditing] = useState(false);
 
+  const group = groups.find(g => g.id === currentGroupId);
+  const { canEditExpense } = getPerms(group, user?.uid);
+  const getNickname = useNickname(currentGroupId ?? undefined);
+
+  const canEdit = canEditExpense(expense);
   const myShare = expense.splits.find(s => s.uid === user?.uid);
   const isMyExpense = expense.paidBy === user?.uid;
-  const symbol = getCurrency(expense.currency || defaultCurrency).symbol;
+  const symbol = getCurrency(expense.currency || group?.currency || 'USD').symbol;
   const cat = getExpenseCategory(expense.category);
   const CatIcon = cat.icon;
 
@@ -73,14 +75,14 @@ export function ExpenseCard({ expense, user, members, defaultCurrency, canEdit, 
                 {canEdit && (
                   <>
                     <button
-                      onClick={() => onEdit(expense)}
+                      onClick={() => setEditing(true)}
                       className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-400 hover:bg-emerald-400/10 transition-colors"
                       aria-label="تعديل"
                     >
                       <Edit2 size={14} />
                     </button>
                     <button
-                      onClick={() => onDelete(expense)}
+                      onClick={() => deleteExpense(expense)}
                       className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"
                       aria-label="حذف"
                     >
@@ -124,6 +126,14 @@ export function ExpenseCard({ expense, user, members, defaultCurrency, canEdit, 
             );
           })}
         </div>
+      )}
+
+      {editing && (
+        <ExpenseFormModal
+          expense={expense}
+          defaultCurrency={group?.currency || 'USD'}
+          onClose={() => setEditing(false)}
+        />
       )}
     </div>
   );

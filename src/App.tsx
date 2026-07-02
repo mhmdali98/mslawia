@@ -1,10 +1,6 @@
-import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from './lib/firebase';
 import { useStore } from './store/useStore';
-import { useAuth } from './hooks/useAuth';
-import { useGroups } from './hooks/useGroups';
+import { useAuthListener, useGroupsListener } from './hooks/useListeners';
 import { LoginPage } from './components/auth/LoginPage';
 import { Dashboard } from './components/dashboard/Dashboard';
 import { GroupPage } from './components/groups/GroupPage';
@@ -16,9 +12,8 @@ import { OfflineBanner } from './components/ui/OfflineBanner';
 import { InstallPrompt } from './components/ui/InstallPrompt';
 
 function AppRoutes() {
-  const { user } = useStore();
-  useAuth();
-  useGroups();
+  const user = useStore(s => s.user);
+  useGroupsListener();
 
   if (!user) return <LoginPage />;
 
@@ -33,14 +28,9 @@ function AppRoutes() {
 }
 
 export default function App() {
-  const [authChecked, setAuthChecked] = useState(false);
+  const authReady = useAuthListener();
 
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, () => setAuthChecked(true));
-    return unsub;
-  }, []);
-
-  if (!authChecked) return <FullPageLoader />;
+  if (!authReady) return <FullPageLoader />;
 
   return (
     <BrowserRouter basename="/mslawia">

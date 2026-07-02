@@ -8,6 +8,7 @@ import { useStore } from '../../store/useStore';
 import { getCurrency } from '../../lib/currencies';
 import { EmptyState } from '../ui/EmptyState';
 import { Avatar } from '../ui/Avatar';
+import { LoadMore } from '../ui/LoadMore';
 import { usePagination } from '../../hooks/usePagination';
 import { ActivityLogEntry, ActivityAction, Expense, Settlement } from '../../types';
 
@@ -118,7 +119,7 @@ export function ActivityFeed() {
         ...settlements.map(settlementToEntry),
       ].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 
-  const { visible, hasMore, loadMore, sentinelRef, remaining } = usePagination(entries, 15, currentGroupId);
+  const page = usePagination(entries, 15, currentGroupId);
 
   if (entries.length === 0) {
     return (
@@ -132,7 +133,7 @@ export function ActivityFeed() {
 
   return (
     <div className="space-y-2">
-      {visible.map((entry) => {
+      {page.visible.map((entry) => {
         const { primary, secondary } = actionLabel(entry, user?.uid);
         return (
           <div key={entry.id} className="card p-3 flex items-start gap-3">
@@ -160,16 +161,7 @@ export function ActivityFeed() {
           </div>
         );
       })}
-      {hasMore && (
-        <div ref={sentinelRef} className="py-4 flex justify-center">
-          <button
-            onClick={loadMore}
-            className="text-slate-400 hover:text-slate-200 text-xs font-medium px-4 py-2 rounded-lg border border-slate-700 hover:border-slate-600 transition-colors"
-          >
-            عرض المزيد ({remaining})
-          </button>
-        </div>
-      )}
+      <LoadMore {...page} />
     </div>
   );
 }

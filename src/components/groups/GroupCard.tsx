@@ -6,17 +6,15 @@ import { getGroupCategory } from '../../lib/categories';
 import { getCurrency } from '../../lib/currencies';
 
 export function GroupCard({ group }: { group: Group }) {
-  const { setCurrentGroupId, groupBalanceCache } = useStore();
+  const groupBalanceCache = useStore(s => s.groupBalanceCache);
   const navigate = useNavigate();
   const cat = getGroupCategory(group.category);
   const CatIcon = cat.icon;
   const cached = groupBalanceCache[group.id];
   const symbol = getCurrency(cached?.currency || group.currency).symbol;
 
-  const handleOpen = () => {
-    setCurrentGroupId(group.id);
-    navigate(`/group/${group.id}`);
-  };
+  // GroupPage owns currentGroupId (via useGroupData) — just navigate.
+  const handleOpen = () => navigate(`/group/${group.id}`);
 
   const balance = cached?.amount;
   const isSettled = balance !== undefined && Math.abs(balance) < 0.01;
