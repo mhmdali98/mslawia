@@ -1,5 +1,9 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp, CheckCircle, ArrowLeftRight } from 'lucide-react';
+import { useStore } from '../../store/useStore';
+import { useSettle } from '../../hooks/useSettle';
+import { useNickname } from '../../hooks/useNickname';
+import { getPerms } from '../../lib/permissions';
 import { Avatar } from '../ui/Avatar';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { Balance, Transfer } from '../../types';
@@ -8,20 +12,20 @@ interface Props {
   balances: Balance[];
   transfers: Transfer[];
   symbol: string;
-  myUid: string | undefined;
-  canSettle: boolean;
   simplifyDebts: boolean;
-  getNickname: (uid: string, fallback: string) => string;
-  settlingKey: string | null;
-  onSettle: (transfer: Transfer) => void;
 }
 
-function memberName(uid: string, displayName: string, myUid: string | undefined, getNickname: (uid: string, fallback: string) => string) {
-  if (uid === myUid) return 'أنت';
-  return getNickname(uid, displayName);
-}
+export function BalancesView({ balances, transfers, symbol, simplifyDebts }: Props) {
+  const { user, groups, currentGroupId } = useStore();
+  const group = groups.find(g => g.id === currentGroupId);
+  const { canSettle } = getPerms(group, user?.uid);
+  const getNickname = useNickname(currentGroupId ?? undefined);
+  const { settlingKey, settle } = useSettle(group?.currency || 'USD');
+  const myUid = user?.uid;
 
-export function BalancesView({ balances, transfers, symbol, myUid, canSettle, simplifyDebts, getNickname, settlingKey, onSettle }: Props) {
+  const memberName = (uid: string, displayName: string) =>
+    uid === myUid ? 'أنت' : getNickname(uid, displayName);
+
   const creditors = balances.filter(b => b.amount > 0.01).sort((a, b) => b.amount - a.amount);
   const debtors = balances.filter(b => b.amount < -0.01).sort((a, b) => a.amount - b.amount);
   const settled = balances.filter(b => Math.abs(b.amount) <= 0.01);
@@ -29,7 +33,7 @@ export function BalancesView({ balances, transfers, symbol, myUid, canSettle, si
   const [openUids, setOpenUids] = useState<Set<string>>(() => new Set(creditors.map(c => c.uid)));
   const toggle = (uid: string) => setOpenUids(prev => {
     const next = new Set(prev);
-    next.has(uid) ? next.delete(uid) : next.add(uid);
+    if (next.has(uid)) next.delete(uid); else next.add(uid);
     return next;
   });
 
@@ -50,11 +54,28 @@ export function BalancesView({ balances, transfers, symbol, myUid, canSettle, si
     );
   }
 
+  const settleButton = (t: Transfer) => {
+    const key = `${t.from}-${t.to}`;
+    return (
+      <div className="flex gap-2 mt-2">
+        <button
+          onClick={() => settle(t)}
+          disabled={settlingKey === key}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-500/40 text-emerald-400 text-xs font-medium hover:bg-emerald-500/10 transition-colors disabled:opacity-50"
+        >
+          {settlingKey === key
+            ? <LoadingSpinner size="sm" />
+            : <><ArrowLeftRight size={12} /> تسوية</>}
+        </button>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-2 pb-6">
       {/* Creditors */}
       {creditors.map(b => {
-        const name = memberName(b.uid, b.displayName, myUid, getNickname);
+        const name = memberName(b.uid, b.displayName);
         const isOpen = openUids.has(b.uid);
         const theirDebtors = transfers.filter(t => t.to === b.uid);
 
@@ -78,38 +99,20 @@ export function BalancesView({ balances, transfers, symbol, myUid, canSettle, si
 
             {isOpen && theirDebtors.length > 0 && (
               <div className="border-t border-slate-800 divide-y divide-slate-800/50">
-                {theirDebtors.map(t => {
-                  const fromName = memberName(t.from, t.fromName, myUid, getNickname);
-                  const key = `${t.from}-${t.to}`;
-                  const isMe = t.from === myUid;
-
-                  return (
-                    <div key={key} className="px-4 py-3 flex gap-3">
-                      <Avatar uid={t.from} name={t.fromName} photoURL={t.fromPhoto} size="sm" className="mt-0.5 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-slate-300 text-sm leading-snug">
-                          <span className="text-white font-medium">{fromName}</span>
-                          {' '}يدين بـ{' '}
-                          <span className="text-emerald-400 font-bold">{t.amount.toFixed(2)} {symbol}</span>
-                          {' '}لـ <span className="text-white font-medium">{name}</span>
-                        </p>
-                        {(canSettle && isMe) && (
-                          <div className="flex gap-2 mt-2">
-                            <button
-                              onClick={() => onSettle(t)}
-                              disabled={settlingKey === key}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-500/40 text-emerald-400 text-xs font-medium hover:bg-emerald-500/10 transition-colors disabled:opacity-50"
-                            >
-                              {settlingKey === key
-                                ? <LoadingSpinner size="sm" />
-                                : <><ArrowLeftRight size={12} /> تسوية</>}
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                {theirDebtors.map(t => (
+                  <div key={`${t.from}-${t.to}`} className="px-4 py-3 flex gap-3">
+                    <Avatar uid={t.from} name={t.fromName} photoURL={t.fromPhoto} size="sm" className="mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-slate-300 text-sm leading-snug">
+                        <span className="text-white font-medium">{memberName(t.from, t.fromName)}</span>
+                        {' '}يدين بـ{' '}
+                        <span className="text-emerald-400 font-bold">{t.amount.toFixed(2)} {symbol}</span>
+                        {' '}لـ <span className="text-white font-medium">{name}</span>
+                      </p>
+                      {canSettle && t.from === myUid && settleButton(t)}
                     </div>
-                  );
-                })}
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -118,7 +121,7 @@ export function BalancesView({ balances, transfers, symbol, myUid, canSettle, si
 
       {/* Debtors */}
       {debtors.map(b => {
-        const name = memberName(b.uid, b.displayName, myUid, getNickname);
+        const name = memberName(b.uid, b.displayName);
         const isOpen = openUids.has(b.uid);
         const theirCreditors = transfers.filter(t => t.from === b.uid);
         const isMe = b.uid === myUid;
@@ -143,37 +146,20 @@ export function BalancesView({ balances, transfers, symbol, myUid, canSettle, si
 
             {isOpen && theirCreditors.length > 0 && (
               <div className="border-t border-slate-800 divide-y divide-slate-800/50">
-                {theirCreditors.map(t => {
-                  const toName = memberName(t.to, t.toName, myUid, getNickname);
-                  const key = `${t.from}-${t.to}`;
-
-                  return (
-                    <div key={key} className="px-4 py-3 flex gap-3">
-                      <Avatar uid={t.to} name={t.toName} photoURL={t.toPhoto} size="sm" className="mt-0.5 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-slate-300 text-sm leading-snug">
-                          <span className="text-white font-medium">{name}</span>
-                          {' '}يدين بـ{' '}
-                          <span className="text-red-400 font-bold">{t.amount.toFixed(2)} {symbol}</span>
-                          {' '}لـ <span className="text-white font-medium">{toName}</span>
-                        </p>
-                        {(canSettle && isMe) && (
-                          <div className="flex gap-2 mt-2">
-                            <button
-                              onClick={() => onSettle(t)}
-                              disabled={settlingKey === key}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-500/40 text-emerald-400 text-xs font-medium hover:bg-emerald-500/10 transition-colors disabled:opacity-50"
-                            >
-                              {settlingKey === key
-                                ? <LoadingSpinner size="sm" />
-                                : <><ArrowLeftRight size={12} /> تسوية</>}
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                {theirCreditors.map(t => (
+                  <div key={`${t.from}-${t.to}`} className="px-4 py-3 flex gap-3">
+                    <Avatar uid={t.to} name={t.toName} photoURL={t.toPhoto} size="sm" className="mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-slate-300 text-sm leading-snug">
+                        <span className="text-white font-medium">{name}</span>
+                        {' '}يدين بـ{' '}
+                        <span className="text-red-400 font-bold">{t.amount.toFixed(2)} {symbol}</span>
+                        {' '}لـ <span className="text-white font-medium">{memberName(t.to, t.toName)}</span>
+                      </p>
+                      {canSettle && isMe && settleButton(t)}
                     </div>
-                  );
-                })}
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -181,28 +167,20 @@ export function BalancesView({ balances, transfers, symbol, myUid, canSettle, si
       })}
 
       {/* Settled members */}
-      {settled.map(b => {
-        const name = memberName(b.uid, b.displayName, myUid, getNickname);
-        const isOpen = openUids.has(b.uid);
-        return (
-          <div key={b.uid} className="card overflow-hidden">
-            <button
-              onClick={() => toggle(b.uid)}
-              className="w-full flex items-center gap-3 p-4 text-right"
-            >
-              <Avatar uid={b.uid} name={b.displayName} photoURL={b.photoURL} size="md" />
-              <div className="flex-1 min-w-0">
-                <p className="text-slate-400 font-semibold text-sm">{name}</p>
-                <p className="text-slate-500 text-sm flex items-center gap-1.5 mt-0.5">
-                  <CheckCircle size={13} className="text-emerald-500" />
-                  مسوّى
-                </p>
-              </div>
-              {isOpen ? <ChevronUp size={18} className="text-slate-600 flex-shrink-0" /> : <ChevronDown size={18} className="text-slate-600 flex-shrink-0" />}
-            </button>
+      {settled.map(b => (
+        <div key={b.uid} className="card overflow-hidden">
+          <div className="w-full flex items-center gap-3 p-4 text-right">
+            <Avatar uid={b.uid} name={b.displayName} photoURL={b.photoURL} size="md" />
+            <div className="flex-1 min-w-0">
+              <p className="text-slate-400 font-semibold text-sm">{memberName(b.uid, b.displayName)}</p>
+              <p className="text-slate-500 text-sm flex items-center gap-1.5 mt-0.5">
+                <CheckCircle size={13} className="text-emerald-500" />
+                مسوّى
+              </p>
+            </div>
           </div>
-        );
-      })}
+        </div>
+      ))}
 
       {/* Simplify debts banner */}
       {simplifyDebts && savedCount > 0 && (

@@ -1,29 +1,30 @@
 import { useState } from 'react';
-import { ArrowLeftRight, CheckCircle, Plus, X, ChevronDown, Trash2 } from 'lucide-react';
+import { ArrowLeftRight, CheckCircle, Plus, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useStore } from '../../store/useStore';
-import { useExpenses } from '../../hooks/useExpenses';
+import { usePagination } from '../../hooks/usePagination';
+import { useSettle } from '../../hooks/useSettle';
+import { addSettlement, deleteSettlement, settleTransfer } from '../../lib/actions';
 import { confirmAction } from '../../store/useConfirm';
+import { getPerms } from '../../lib/permissions';
 import { getCurrency } from '../../lib/currencies';
 import { Transfer } from '../../types';
 import { EmptyState } from '../ui/EmptyState';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { Avatar } from '../ui/Avatar';
-import { usePagination } from '../../hooks/usePagination';
-
-interface Props { transfers: Transfer[]; }
+import { Modal } from '../ui/Modal';
+import { Select } from '../ui/Select';
+import { LoadMore } from '../ui/LoadMore';
 
 function RecordPaymentModal({ onClose }: { onClose: () => void }) {
   const { user, members, groups, currentGroupId, addToast } = useStore();
-  const { addSettlement } = useExpenses();
   const group = groups.find(g => g.id === currentGroupId);
   const currency = group?.currency || 'USD';
   const symbol = getCurrency(currency).symbol;
 
   const [from, setFrom] = useState(user?.uid || '');
-  const initialTo = members.find(m => m.uid !== user?.uid)?.uid || '';
-  const [to, setTo] = useState(initialTo);
+  const [to, setTo] = useState(members.find(m => m.uid !== user?.uid)?.uid || '');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
@@ -45,114 +46,83 @@ function RecordPaymentModal({ onClose }: { onClose: () => void }) {
       toPhoto: toMember.photoURL,
       amount: amt,
       currency,
-      note: note.trim() || undefined,
+      note,
     });
     setLoading(false);
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4">
-      <div className="card w-full max-w-md p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-white">تسجيل دفعة</h2>
-          <button onClick={onClose} className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors">
-            <X size={18} />
-          </button>
+    <Modal title="تسجيل دفعة" onClose={onClose}>
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="label">من دفع؟</label>
+            <Select value={from} onChange={e => setFrom(e.target.value)}>
+              {members.map(m => (
+                <option key={m.uid} value={m.uid}>{m.uid === user?.uid ? 'أنا' : m.displayName}</option>
+              ))}
+            </Select>
+          </div>
+          <div>
+            <label className="label">لمن؟</label>
+            <Select value={to} onChange={e => setTo(e.target.value)}>
+              {members.filter(m => m.uid !== from).map(m => (
+                <option key={m.uid} value={m.uid}>{m.uid === user?.uid ? 'أنا' : m.displayName}</option>
+              ))}
+            </Select>
+          </div>
         </div>
 
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">من دفع؟</label>
-              <div className="relative">
-                <select className="input appearance-none" value={from} onChange={e => setFrom(e.target.value)}>
-                  {members.map(m => (
-                    <option key={m.uid} value={m.uid}>{m.uid === user?.uid ? 'أنا' : m.displayName}</option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
-              </div>
-            </div>
-            <div>
-              <label className="label">لمن؟</label>
-              <div className="relative">
-                <select className="input appearance-none" value={to} onChange={e => setTo(e.target.value)}>
-                  {members.filter(m => m.uid !== from).map(m => (
-                    <option key={m.uid} value={m.uid}>{m.uid === user?.uid ? 'أنا' : m.displayName}</option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <label className="label">المبلغ ({symbol})</label>
-            <input
-              className="input"
-              type="number"
-              placeholder="0.00"
-              min="0"
-              step="0.01"
-              value={amount}
-              onChange={e => setAmount(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-            />
-          </div>
-
-          <div>
-            <label className="label">ملاحظة (اختيارية)</label>
-            <input
-              className="input"
-              placeholder="سبب الدفع..."
-              value={note}
-              onChange={e => setNote(e.target.value)}
-            />
-          </div>
-
-          <button
-            onClick={handleSubmit}
-            disabled={loading}
-            className="btn-primary w-full flex items-center justify-center gap-2"
-          >
-            {loading ? <LoadingSpinner size="sm" /> : 'تسجيل الدفعة'}
-          </button>
+        <div>
+          <label className="label">المبلغ ({symbol})</label>
+          <input
+            className="input"
+            type="number"
+            placeholder="0.00"
+            min="0"
+            step="0.01"
+            value={amount}
+            onChange={e => setAmount(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+          />
         </div>
+
+        <div>
+          <label className="label">ملاحظة (اختيارية)</label>
+          <input
+            className="input"
+            placeholder="سبب الدفع..."
+            value={note}
+            onChange={e => setNote(e.target.value)}
+          />
+        </div>
+
+        <button
+          onClick={handleSubmit}
+          disabled={loading}
+          className="btn-primary w-full flex items-center justify-center gap-2"
+        >
+          {loading ? <LoadingSpinner size="sm" /> : 'تسجيل الدفعة'}
+        </button>
       </div>
-    </div>
+    </Modal>
   );
 }
 
-export function SettlementsView({ transfers }: Props) {
+export function SettlementsView({ transfers }: { transfers: Transfer[] }) {
   const { user, settlements, groups, currentGroupId } = useStore();
-  const { addSettlement, deleteSettlement } = useExpenses();
-  const [loadingKey, setLoadingKey] = useState<string | null>(null);
+  const [settlingAll, setSettlingAll] = useState(false);
   const [showRecord, setShowRecord] = useState(false);
 
   const group = groups.find(g => g.id === currentGroupId);
   const groupCurrency = group?.currency || 'USD';
   const groupSymbol = getCurrency(groupCurrency).symbol;
-  const isOwner = group?.createdBy === user?.uid;
-  const canSettle = isOwner || group?.permissions?.membersCanSettle !== false;
-
-  const handleSettle = async (t: Transfer) => {
-    const key = `${t.from}-${t.to}`;
-    setLoadingKey(key);
-    await addSettlement({
-      from: t.from,
-      fromName: t.fromName,
-      fromPhoto: t.fromPhoto,
-      to: t.to,
-      toName: t.toName,
-      toPhoto: t.toPhoto,
-      amount: t.amount,
-      currency: groupCurrency,
-    });
-    setLoadingKey(null);
-  };
+  const { canSettle, canDeleteSettlement } = getPerms(group, user?.uid);
+  const { settlingKey, settle } = useSettle(groupCurrency);
 
   const myTransfers = transfers.filter(t => t.from === user?.uid || t.to === user?.uid);
+
   const handleSettleAll = async () => {
     const ok = await confirmAction({
       title: 'تسوية جميع ديونك؟',
@@ -160,34 +130,13 @@ export function SettlementsView({ transfers }: Props) {
       confirmLabel: 'تسوية الكل',
     });
     if (!ok) return;
-    setLoadingKey('all');
+    setSettlingAll(true);
     for (const t of myTransfers) {
-      await addSettlement({
-        from: t.from,
-        fromName: t.fromName,
-        fromPhoto: t.fromPhoto,
-        to: t.to,
-        toName: t.toName,
-        toPhoto: t.toPhoto,
-        amount: t.amount,
-        currency: groupCurrency,
-      });
+      await settleTransfer(t, groupCurrency);
     }
-    setLoadingKey(null);
+    setSettlingAll(false);
   };
 
-  const handleDelete = async (id: string) => {
-    const ok = await confirmAction({
-      title: 'حذف التسوية؟',
-      description: 'سيتم حذف هذه الدفعة المسجّلة بشكل نهائي.',
-      confirmLabel: 'حذف',
-      variant: 'danger',
-    });
-    if (!ok) return;
-    deleteSettlement(id);
-  };
-
-  const isEmpty = transfers.length === 0 && settlements.length === 0;
   const settlementsPage = usePagination(settlements, 10, currentGroupId);
   const transfersPage = usePagination(transfers, 10, currentGroupId);
 
@@ -213,10 +162,10 @@ export function SettlementsView({ transfers }: Props) {
             {canSettle && myTransfers.length > 1 && (
               <button
                 onClick={handleSettleAll}
-                disabled={loadingKey === 'all'}
+                disabled={settlingAll}
                 className="text-emerald-400 hover:text-emerald-300 text-xs font-medium flex items-center gap-1 transition-colors disabled:opacity-50"
               >
-                {loadingKey === 'all' ? <LoadingSpinner size="sm" /> : <><CheckCircle size={12} /> تسوية الكل</>}
+                {settlingAll ? <LoadingSpinner size="sm" /> : <><CheckCircle size={12} /> تسوية الكل</>}
               </button>
             )}
           </div>
@@ -238,11 +187,11 @@ export function SettlementsView({ transfers }: Props) {
                   <Avatar uid={t.to} name={t.toName} photoURL={t.toPhoto} size="sm" />
                   {isInvolved && canSettle && (
                     <button
-                      onClick={() => handleSettle(t)}
-                      disabled={loadingKey === key}
+                      onClick={() => settle(t)}
+                      disabled={settlingKey === key}
                       className="btn-primary text-xs flex items-center gap-1.5"
                     >
-                      {loadingKey === key
+                      {settlingKey === key
                         ? <LoadingSpinner size="sm" />
                         : <><CheckCircle size={13} /> تمّت</>
                       }
@@ -252,16 +201,7 @@ export function SettlementsView({ transfers }: Props) {
               );
             })}
           </div>
-          {transfersPage.hasMore && (
-            <div ref={transfersPage.sentinelRef} className="py-3 flex justify-center">
-              <button
-                onClick={transfersPage.loadMore}
-                className="text-slate-400 hover:text-slate-200 text-xs font-medium px-4 py-2 rounded-lg border border-slate-700 hover:border-slate-600 transition-colors"
-              >
-                عرض المزيد ({transfersPage.remaining})
-              </button>
-            </div>
-          )}
+          <LoadMore {...transfersPage} />
         </div>
       )}
 
@@ -271,7 +211,6 @@ export function SettlementsView({ transfers }: Props) {
           <div className="space-y-2">
             {settlementsPage.visible.map(s => {
               const symbol = getCurrency(s.currency || groupCurrency).symbol;
-              const canDelete = isOwner || s.createdBy === user?.uid;
               return (
                 <div key={s.id} className="card p-4 flex items-center gap-3">
                   <Avatar uid={s.from} name={s.fromName} photoURL={s.fromPhoto} size="sm" />
@@ -288,9 +227,9 @@ export function SettlementsView({ transfers }: Props) {
                   </div>
                   <span className="text-slate-400 font-medium text-sm">{s.amount.toFixed(2)} {symbol}</span>
                   <CheckCircle className="text-emerald-500" size={16} />
-                  {canDelete && (
+                  {canDeleteSettlement(s) && (
                     <button
-                      onClick={() => handleDelete(s.id)}
+                      onClick={() => deleteSettlement(s)}
                       className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"
                     >
                       <Trash2 size={13} />
@@ -300,20 +239,11 @@ export function SettlementsView({ transfers }: Props) {
               );
             })}
           </div>
-          {settlementsPage.hasMore && (
-            <div ref={settlementsPage.sentinelRef} className="py-3 flex justify-center">
-              <button
-                onClick={settlementsPage.loadMore}
-                className="text-slate-400 hover:text-slate-200 text-xs font-medium px-4 py-2 rounded-lg border border-slate-700 hover:border-slate-600 transition-colors"
-              >
-                عرض المزيد ({settlementsPage.remaining})
-              </button>
-            </div>
-          )}
+          <LoadMore {...settlementsPage} />
         </div>
       )}
 
-      {isEmpty && (
+      {transfers.length === 0 && settlements.length === 0 && (
         <EmptyState
           icon={ArrowLeftRight}
           title="لا توجد تسويات"

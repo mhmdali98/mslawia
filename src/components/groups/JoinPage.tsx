@@ -1,23 +1,26 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useGroups } from '../../hooks/useGroups';
+import { joinByInvite } from '../../lib/actions';
 import { useStore } from '../../store/useStore';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 
 export function JoinPage() {
   const { code } = useParams<{ code: string }>();
-  const { joinByInvite } = useGroups();
-  const { user } = useStore();
+  const user = useStore(s => s.user);
   const navigate = useNavigate();
   const [status, setStatus] = useState<'joining' | 'done' | 'error'>('joining');
+  const attempted = useRef(false);
 
   useEffect(() => {
-    if (!code || !user) return;
-    joinByInvite(code.toUpperCase()).then(ok => {
-      setStatus(ok ? 'done' : 'error');
-      setTimeout(() => navigate('/'), 1500);
+    if (!code || !user || attempted.current) return;
+    attempted.current = true; // guard against double-invocation (StrictMode / re-renders)
+    joinByInvite(code.toUpperCase()).then(groupId => {
+      setStatus(groupId ? 'done' : 'error');
+      setTimeout(() => {
+        navigate(groupId ? `/group/${groupId}` : '/', { replace: true });
+      }, 1500);
     });
-  }, [code, user]);
+  }, [code, user, navigate]);
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">

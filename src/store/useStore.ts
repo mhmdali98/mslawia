@@ -12,7 +12,6 @@ interface AppState {
   activityLogs: ActivityLogEntry[];
   groupBalanceCache: Record<string, { amount: number; currency: string; updatedAt: string }>;
   toasts: Toast[];
-  isLoading: boolean;
   groupsLoaded: boolean;
   expensesLoaded: boolean;
 
@@ -28,25 +27,27 @@ interface AppState {
   setExpensesLoaded: (loaded: boolean) => void;
   addToast: (message: string, type: Toast['type']) => void;
   removeToast: (id: string) => void;
-  setLoading: (loading: boolean) => void;
   reset: () => void;
 }
+
+const initialData = {
+  user: null,
+  groups: [],
+  currentGroupId: null,
+  members: [],
+  expenses: [],
+  settlements: [],
+  activityLogs: [],
+  groupBalanceCache: {},
+  toasts: [],
+  groupsLoaded: false,
+  expensesLoaded: false,
+};
 
 export const useStore = create<AppState>()(
   persist(
     (set) => ({
-      user: null,
-      groups: [],
-      currentGroupId: null,
-      members: [],
-      expenses: [],
-      settlements: [],
-      activityLogs: [],
-      groupBalanceCache: {},
-      toasts: [],
-      isLoading: false,
-      groupsLoaded: false,
-      expensesLoaded: false,
+      ...initialData,
 
       setUser: (user) => set({ user }),
       setGroups: (groups) => set({ groups }),
@@ -71,21 +72,7 @@ export const useStore = create<AppState>()(
         }, 4000);
       },
       removeToast: (id) => set((state) => ({ toasts: state.toasts.filter(t => t.id !== id) })),
-      setLoading: (isLoading) => set({ isLoading }),
-      reset: () => set({
-        user: null,
-        groups: [],
-        currentGroupId: null,
-        members: [],
-        expenses: [],
-        settlements: [],
-        activityLogs: [],
-        groupBalanceCache: {},
-        toasts: [],
-        isLoading: false,
-        groupsLoaded: false,
-        expensesLoaded: false,
-      }),
+      reset: () => set(initialData),
     }),
     {
       name: 'mslawia-storage',

@@ -1,25 +1,24 @@
 import { TrendingUp, Receipt, PieChart, Calendar } from 'lucide-react';
+import { format } from 'date-fns';
+import { ar } from 'date-fns/locale';
 import { useStore } from '../../store/useStore';
 import { getCurrency } from '../../lib/currencies';
 import { getExpenseCategory } from '../../lib/categories';
 import { Avatar } from '../ui/Avatar';
 import { EmptyState } from '../ui/EmptyState';
-import { useT, useMonthName } from '../../lib/i18n';
 
 export function GroupStats() {
   const { expenses, members, groups, currentGroupId } = useStore();
   const group = groups.find(g => g.id === currentGroupId);
   const groupCurrency = group?.currency || 'USD';
   const symbol = getCurrency(groupCurrency).symbol;
-  const t = useT();
-  const monthName = useMonthName();
 
   if (expenses.length === 0) {
     return (
       <EmptyState
         icon={TrendingUp}
-        title={t('statsEmpty')}
-        description={t('statsEmptyDesc')}
+        title="لا توجد إحصائيات بعد"
+        description="أضف مصاريف لترى التحليلات والملخصات"
       />
     );
   }
@@ -68,18 +67,18 @@ export function GroupStats() {
         <div className="card p-4">
           <div className="flex items-center gap-2 text-slate-400 text-xs mb-2">
             <Receipt size={14} />
-            <span>{t('statsTotal')}</span>
+            <span>إجمالي المصاريف</span>
           </div>
           <p className="text-white font-bold text-xl">{total.toFixed(2)} <span className="text-slate-500 text-sm font-normal">{symbol}</span></p>
-          <p className="text-slate-500 text-xs mt-1">{expenses.length} {t('expense')}</p>
+          <p className="text-slate-500 text-xs mt-1">{expenses.length} مصروف</p>
         </div>
         <div className="card p-4">
           <div className="flex items-center gap-2 text-slate-400 text-xs mb-2">
             <TrendingUp size={14} />
-            <span>{t('statsAvg')}</span>
+            <span>متوسط المصروف</span>
           </div>
           <p className="text-white font-bold text-xl">{avg.toFixed(2)} <span className="text-slate-500 text-sm font-normal">{symbol}</span></p>
-          <p className="text-slate-500 text-xs mt-1">{t('statsPerExpense')}</p>
+          <p className="text-slate-500 text-xs mt-1">للمصروف الواحد</p>
         </div>
       </div>
 
@@ -87,7 +86,7 @@ export function GroupStats() {
       <div>
         <div className="flex items-center gap-2 mb-3">
           <PieChart className="text-slate-400" size={16} />
-          <h3 className="text-slate-300 font-semibold">{t('statsByCategory')}</h3>
+          <h3 className="text-slate-300 font-semibold">حسب الفئة</h3>
         </div>
         <div className="card p-4 space-y-3">
           {categoryRows.map(({ id, amount, cat }) => {
@@ -119,7 +118,7 @@ export function GroupStats() {
       <div>
         <div className="flex items-center gap-2 mb-3">
           <TrendingUp className="text-slate-400" size={16} />
-          <h3 className="text-slate-300 font-semibold">{t('statsByPayer')}</h3>
+          <h3 className="text-slate-300 font-semibold">من دفع أكثر</h3>
         </div>
         <div className="card p-4 space-y-3">
           {payerRows.map(({ uid, amount, member }) => {
@@ -134,7 +133,7 @@ export function GroupStats() {
                 />
                 <div className="flex-1 min-w-0">
                   <p className="text-slate-200 text-sm font-medium truncate">
-                    {member?.displayName || t('formerMember')}
+                    {member?.displayName || 'عضو سابق'}
                   </p>
                   <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden mt-1.5">
                     <div
@@ -158,13 +157,13 @@ export function GroupStats() {
         <div>
           <div className="flex items-center gap-2 mb-3">
             <Calendar className="text-slate-400" size={16} />
-            <h3 className="text-slate-300 font-semibold">{t('statsByMonth')}</h3>
+            <h3 className="text-slate-300 font-semibold">آخر الأشهر</h3>
           </div>
           <div className="card p-4 space-y-2.5">
             {monthRows.map(([month, amount]) => {
               const pct = (amount / monthMax) * 100;
-              const [y, m] = month.split('-');
-              const label = `${monthName(parseInt(m, 10))} ${y}`;
+              const [y, m] = month.split('-').map(Number);
+              const label = format(new Date(y, m - 1, 1), 'MMMM yyyy', { locale: ar });
               return (
                 <div key={month} className="flex items-center gap-3">
                   <span className="text-slate-400 text-xs w-20 flex-shrink-0">{label}</span>

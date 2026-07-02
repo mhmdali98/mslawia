@@ -1,35 +1,25 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Receipt, Search, X } from 'lucide-react';
+import { format } from 'date-fns';
+import { ar } from 'date-fns/locale';
 import { useStore } from '../../store/useStore';
-import { useExpenses } from '../../hooks/useExpenses';
+import { usePagination } from '../../hooks/usePagination';
+import { sortExpensesDesc } from '../../lib/calculations';
 import { EXPENSE_CATEGORIES } from '../../lib/categories';
-import { confirmAction } from '../../store/useConfirm';
 import { EmptyState } from '../ui/EmptyState';
 import { ExpenseSkeleton } from '../ui/Skeleton';
-import { ExpenseFormModal } from './ExpenseFormModal';
+import { LoadMore } from '../ui/LoadMore';
 import { ExpenseCard } from './ExpenseCard';
-import { Expense } from '../../types';
-import { useMonthName } from '../../lib/i18n';
-import { useNickname } from '../../hooks/useNickname';
+
+function monthLabel(dateStr: string): string {
+  const [y, m] = dateStr.slice(0, 7).split('-').map(Number);
+  return format(new Date(y, m - 1, 1), 'MMMM yyyy', { locale: ar });
+}
 
 export function ExpenseList() {
-  const { expenses, user, members, groups, currentGroupId, expensesLoaded } = useStore();
-  const { deleteExpense } = useExpenses();
-  const [editing, setEditing] = useState<Expense | null>(null);
+  const { expenses, currentGroupId, expensesLoaded } = useStore();
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
-  const monthName = useMonthName();
-
-  const group = groups.find(g => g.id === currentGroupId);
-  const defaultCurrency = group?.currency || 'USD';
-  const isOwner = group?.createdBy === user?.uid;
-
-  const getMonthLabel = (dateStr: string) => {
-    const [y, m] = dateStr.slice(0, 7).split('-');
-    return `${monthName(parseInt(m, 10))} ${y}`;
-  };
-
-  const getNickname = useNickname(currentGroupId || undefined);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -42,44 +32,10 @@ export function ExpenseList() {
       )
       .filter(e => !filterCategory || e.category === filterCategory)
       .slice()
-      .sort((a, b) => {
-        if (a.date !== b.date) return a.date < b.date ? 1 : -1;
-        return (a.createdAt || '') < (b.createdAt || '') ? 1 : -1;
-      });
+      .sort(sortExpensesDesc);
   }, [expenses, search, filterCategory]);
 
-  const PAGE_SIZE = 10;
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [search, filterCategory, currentGroupId]);
-
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (visibleCount >= filtered.length) return;
-    const el = sentinelRef.current;
-    if (!el) return;
-    const obs = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting) {
-        setVisibleCount(c => Math.min(c + PAGE_SIZE, filtered.length));
-      }
-    }, { rootMargin: '200px' });
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [visibleCount, filtered.length]);
-
-  const visible = filtered.slice(0, visibleCount);
-
-  const canEdit = (e: Expense) => isOwner || e.paidBy === user?.uid || e.createdBy === user?.uid;
-
-  const handleDelete = async (e: Expense) => {
-    const ok = await confirmAction({
-      title: 'حذف المصروف؟',
-      description: `سيتم حذف "${e.title}" بشكل نهائي.`,
-      confirmLabel: 'حذف',
-      variant: 'danger',
-    });
-    if (!ok) return;
-    deleteExpense(e.id);
-  };
+  const page = usePagination(filtered, 10, `${currentGroupId}|${search}|${filterCategory}`);
 
   if (!expensesLoaded) {
     return (
@@ -88,6 +44,8 @@ export function ExpenseList() {
       </div>
     );
   }
+
+  let lastMonth = '';
 
   return (
     <div className="space-y-4">
@@ -151,85 +109,26 @@ export function ExpenseList() {
         )
       ) : (
         <>
-          <ExpenseListItems
-            filtered={visible}
-            canEdit={canEdit}
-            setEditing={setEditing}
-            handleDelete={handleDelete}
-            user={user}
-            members={members}
-            defaultCurrency={defaultCurrency}
-            getMonthLabel={getMonthLabel}
-            getNickname={getNickname}
-          />
-          {visibleCount < filtered.length && (
-            <div ref={sentinelRef} className="py-4 flex flex-col items-center gap-2">
-              <button
-                onClick={() => setVisibleCount(c => Math.min(c + PAGE_SIZE, filtered.length))}
-                className="text-slate-400 hover:text-slate-200 text-xs font-medium px-4 py-2 rounded-lg border border-slate-700 hover:border-slate-600 transition-colors"
-              >
-                عرض المزيد ({filtered.length - visibleCount})
-              </button>
-            </div>
-          )}
+          <div className="space-y-2">
+            {page.visible.map(expense => {
+              const monthKey = expense.date.slice(0, 7);
+              const isNewMonth = monthKey !== lastMonth;
+              lastMonth = monthKey;
+              return (
+                <div key={expense.id}>
+                  {isNewMonth && (
+                    <p className="text-slate-500 text-xs font-medium px-1 pt-3 pb-2">
+                      {monthLabel(expense.date)}
+                    </p>
+                  )}
+                  <ExpenseCard expense={expense} />
+                </div>
+              );
+            })}
+          </div>
+          <LoadMore {...page} />
         </>
       )}
-
-      {editing && (
-        <ExpenseFormModal
-          expense={editing}
-          defaultCurrency={defaultCurrency}
-          onClose={() => setEditing(null)}
-        />
-      )}
-    </div>
-  );
-}
-
-interface ItemsProps {
-  filtered: Expense[];
-  canEdit: (e: Expense) => boolean;
-  setEditing: (e: Expense) => void;
-  handleDelete: (e: Expense) => void;
-  user: { uid: string } | null;
-  members: { uid: string; displayName: string; photoURL: string }[];
-  defaultCurrency: string;
-  getMonthLabel: (dateStr: string) => string;
-  getNickname: (uid: string, fallback: string) => string;
-}
-
-function ExpenseListItems({
-  filtered, canEdit, setEditing, handleDelete, user, members, defaultCurrency, getMonthLabel, getNickname,
-}: ItemsProps) {
-  let lastMonth = '';
-
-  return (
-    <div className="space-y-2">
-      {filtered.map(expense => {
-        const monthKey = expense.date.slice(0, 7);
-        const isNewMonth = monthKey !== lastMonth;
-        lastMonth = monthKey;
-
-        return (
-          <div key={expense.id}>
-            {isNewMonth && (
-              <p className="text-slate-500 text-xs font-medium px-1 pt-3 pb-2">
-                {getMonthLabel(expense.date)}
-              </p>
-            )}
-            <ExpenseCard
-              expense={expense}
-              user={user}
-              members={members}
-              defaultCurrency={defaultCurrency}
-              canEdit={canEdit(expense)}
-              getNickname={getNickname}
-              onEdit={setEditing}
-              onDelete={handleDelete}
-            />
-          </div>
-        );
-      })}
     </div>
   );
 }
