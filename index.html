@@ -12,6 +12,20 @@
     <meta name="apple-mobile-web-app-title" content="مصلاوية" />
     <meta name="description" content="تطبيق تقسيم المصاريف بين الأصدقاء" />
     <title>مصلاوية - تقسيم المصاريف</title>
+    <script type="text/javascript">
+      // Counterpart of public/404.html (spa-github-pages): GitHub Pages serves
+      // 404.html for deep links like /mslawia/join/CODE, which redirects here
+      // as /mslawia/?/join/CODE — restore the real path before the app boots
+      // so React Router lands on the right route.
+      (function (l) {
+        if (l.search[1] === '/') {
+          var decoded = l.search.slice(1).split('&').map(function (s) {
+            return s.replace(/~and~/g, '&');
+          }).join('?');
+          window.history.replaceState(null, null, l.pathname.slice(0, -1) + decoded + l.hash);
+        }
+      })(window.location);
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
